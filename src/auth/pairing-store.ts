@@ -6,7 +6,7 @@ export interface PairingStoreData {
 }
 
 export class PairingStore {
-  private readonly file = getAppPaths().pairingStoreFile;
+  private readonly file = getAppPaths().allowlistFile;
 
   async load(): Promise<PairingStoreData> {
     return readJson5File<PairingStoreData>(this.file, { approvedSenderIds: [] });

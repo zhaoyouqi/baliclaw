@@ -7,4 +7,3 @@ export const statusResponseSchema = z.object({
 });
 
 export type StatusResponse = z.infer<typeof statusResponseSchema>;
-

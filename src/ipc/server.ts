@@ -1,7 +1,7 @@
-import type { StatusResponse } from "./schema.js";
+import type { AppStatus } from "../shared/types.js";
 
 export class IpcServer {
-  async getStatus(): Promise<StatusResponse> {
+  async getStatus(): Promise<AppStatus> {
     return {
       ok: true,
       service: "baliclaw",
@@ -9,4 +9,3 @@ export class IpcServer {
     };
   }
 }
-

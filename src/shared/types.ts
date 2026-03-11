@@ -1,11 +1,11 @@
 export type Channel = "telegram";
 export type AccountId = "default";
-export type ChatType = "direct" | "group" | "channel";
+export type ChatType = "direct";
 
 export interface InboundMessage {
   channel: Channel;
   accountId: AccountId;
-  chatType: "direct";
+  chatType: ChatType;
   conversationId: string;
   senderId: string;
   text: string;
@@ -14,16 +14,16 @@ export interface InboundMessage {
 export interface DeliveryTarget {
   channel: Channel;
   accountId: AccountId;
-  chatType: "direct";
+  chatType: ChatType;
   conversationId: string;
 }
 
 export interface PairingRequest {
-  channel: Channel;
-  accountId: AccountId;
-  senderId: string;
   code: string;
-  requestedAt: string;
+  senderId: string;
+  username?: string;
+  createdAt: string;
+  expiresAt: string;
 }
 
 export interface AppStatus {
@@ -31,4 +31,3 @@ export interface AppStatus {
   service: "baliclaw";
   version: string;
 }
-

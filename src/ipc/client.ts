@@ -1,11 +1,20 @@
+import { appErrorCodes, toAppError } from "../shared/errors.js";
+import type { AppStatus } from "../shared/types.js";
+import { statusResponseSchema } from "./schema.js";
 import { IpcServer } from "./server.js";
-import type { StatusResponse } from "./schema.js";
 
 export class IpcClient {
   constructor(private readonly server = new IpcServer()) {}
 
-  getStatus(): Promise<StatusResponse> {
-    return this.server.getStatus();
+  async getStatus(): Promise<AppStatus> {
+    try {
+      const result = await this.server.getStatus();
+      return statusResponseSchema.parse(result);
+    } catch (error) {
+      throw toAppError(error, {
+        message: "Invalid IPC status response",
+        code: appErrorCodes.ipcInvalidResponse
+      });
+    }
   }
 }
-

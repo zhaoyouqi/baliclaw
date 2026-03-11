@@ -1,0 +1,7 @@
+import { ConfigService } from "../../config/service.js";
+
+export async function runConfigGetCommand(): Promise<string> {
+  const config = await new ConfigService().load();
+  return JSON.stringify(config, null, 2);
+}
+

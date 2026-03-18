@@ -1,5 +1,6 @@
-import { appErrorCodes, toAppError } from "../shared/errors.js";
-import { readJson5File, writeJson5File } from "./file-store.js";
+import { ZodError } from "zod";
+import { AppError, appErrorCodes, toAppError } from "../shared/errors.js";
+import { readJson5FileOrDefault, writeJson5File } from "./file-store.js";
 import { getAppPaths, type AppPaths } from "./paths.js";
 import { appConfigSchema, getDefaultConfig, type AppConfig } from "./schema.js";
 
@@ -8,9 +9,24 @@ export class ConfigService {
 
   async load(): Promise<AppConfig> {
     try {
-      const config = await readJson5File(this.paths.configFile, getDefaultConfig());
+      const config = await readJson5FileOrDefault(this.paths.configFile, getDefaultConfig());
       return appConfigSchema.parse(config);
     } catch (error) {
+      if (error instanceof ZodError) {
+        throw new AppError(
+          "Invalid configuration file",
+          appErrorCodes.configInvalid,
+          error,
+          {
+            issues: error.issues.map((issue) => ({
+              path: issue.path.join("."),
+              message: issue.message,
+              code: issue.code
+            }))
+          }
+        );
+      }
+
       throw toAppError(error, {
         message: "Invalid configuration file",
         code: appErrorCodes.configInvalid
@@ -19,6 +35,7 @@ export class ConfigService {
   }
 
   async save(config: AppConfig): Promise<void> {
-    await writeJson5File(this.paths.configFile, config);
+    const parsed = appConfigSchema.parse(config);
+    await writeJson5File(this.paths.configFile, parsed);
   }
 }

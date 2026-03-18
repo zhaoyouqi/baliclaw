@@ -1,0 +1,177 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { ConfigService } from "../src/config/service.js";
+import { getAppPaths } from "../src/config/paths.js";
+import { AppError, appErrorCodes } from "../src/shared/errors.js";
+
+describe("ConfigService", () => {
+  it("returns defaults when the config file is missing", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-config-defaults-"));
+
+    try {
+      const service = new ConfigService(getAppPaths(home));
+      const config = await service.load();
+
+      expect(config.telegram).toEqual({
+        enabled: false,
+        botToken: ""
+      });
+      expect(config.runtime.workingDirectory).toBe(process.cwd());
+      expect(config.tools.availableTools).toEqual(["Bash", "Read", "Write", "Edit"]);
+      expect(config.skills).toEqual({
+        enabled: true,
+        directories: []
+      });
+      expect(config.logging).toEqual({
+        level: "info"
+      });
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("loads and normalizes a valid baliclaw.json5 file", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-config-valid-"));
+    const paths = getAppPaths(home);
+
+    try {
+      await mkdir(paths.rootDir, { recursive: true });
+      await writeFile(
+        paths.configFile,
+        `{
+          telegram: {
+            enabled: true,
+            botToken: "secret"
+          },
+          runtime: {
+            model: "claude-sonnet",
+            maxTurns: 12
+          }
+        }\n`,
+        "utf8"
+      );
+
+      const config = await new ConfigService(paths).load();
+
+      expect(config.telegram).toEqual({
+        enabled: true,
+        botToken: "secret"
+      });
+      expect(config.runtime.model).toBe("claude-sonnet");
+      expect(config.runtime.maxTurns).toBe(12);
+      expect(config.runtime.workingDirectory).toBe(process.cwd());
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("returns a structured error for unknown top-level fields", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-config-unknown-"));
+    const paths = getAppPaths(home);
+
+    try {
+      await mkdir(paths.rootDir, { recursive: true });
+      await writeFile(
+        paths.configFile,
+        `{
+          telegram: {
+            enabled: false,
+            botToken: ""
+          },
+          extra: true
+        }\n`,
+        "utf8"
+      );
+
+      await expect(new ConfigService(paths).load()).rejects.toMatchObject<AppError>({
+        code: appErrorCodes.configInvalid,
+        details: {
+          issues: [
+            expect.objectContaining({
+              path: "",
+              code: "unrecognized_keys"
+            })
+          ]
+        }
+      });
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("rejects enabled telegram config without a bot token", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-config-token-"));
+    const paths = getAppPaths(home);
+
+    try {
+      await mkdir(paths.rootDir, { recursive: true });
+      await writeFile(
+        paths.configFile,
+        `{
+          telegram: {
+            enabled: true
+          }
+        }\n`,
+        "utf8"
+      );
+
+      await expect(new ConfigService(paths).load()).rejects.toMatchObject<AppError>({
+        code: appErrorCodes.configInvalid,
+        details: {
+          issues: [
+            expect.objectContaining({
+              path: "telegram.botToken",
+              message: "telegram.botToken is required when telegram.enabled is true"
+            })
+          ]
+        }
+      });
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("validates before saving and writes normalized JSON5", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-config-save-"));
+    const paths = getAppPaths(home);
+    const service = new ConfigService(paths);
+
+    try {
+      await service.save({
+        telegram: {
+          enabled: false,
+          botToken: ""
+        },
+        runtime: {
+          workingDirectory: "/tmp/workdir"
+        },
+        tools: {
+          availableTools: ["Bash"]
+        },
+        skills: {
+          enabled: false,
+          directories: []
+        },
+        logging: {
+          level: "warn"
+        }
+      });
+
+      await expect(service.load()).resolves.toMatchObject({
+        runtime: {
+          workingDirectory: "/tmp/workdir"
+        },
+        tools: {
+          availableTools: ["Bash"]
+        },
+        logging: {
+          level: "warn"
+        }
+      });
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+});

@@ -11,7 +11,8 @@ export class AppError extends Error {
   constructor(
     message: string,
     readonly code: AppErrorCode,
-    readonly cause?: unknown
+    readonly cause?: unknown,
+    readonly details?: unknown
   ) {
     super(message);
     this.name = "AppError";

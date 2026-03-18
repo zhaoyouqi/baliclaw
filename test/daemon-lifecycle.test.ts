@@ -46,16 +46,21 @@ describe("bootstrap", () => {
   it("creates state directories and loads config before returning context", async () => {
     const home = await mkdtemp(join(tmpdir(), "baliclaw-bootstrap-"));
     const paths = getAppPaths(home);
+    const ipcServer = {
+      start: vi.fn<() => Promise<void>>().mockResolvedValue(),
+      stop: vi.fn<() => Promise<void>>().mockResolvedValue()
+    } as never;
     const configService = {
       load: vi.fn<() => Promise<AppConfig>>().mockResolvedValue(defaultConfig)
     } as never;
 
     try {
-      const context = await bootstrap({ paths, configService });
+      const context = await bootstrap({ paths, configService, ipcServer });
 
       expect(context.paths).toEqual(paths);
       expect(context.config).toEqual(defaultConfig);
       expect(context.configService).toBe(configService);
+      expect(ipcServer.start).toHaveBeenCalledTimes(1);
     } finally {
       await rm(home, { recursive: true, force: true });
     }
@@ -64,6 +69,10 @@ describe("bootstrap", () => {
   it("starts telegram only when enabled and registers a stop hook", async () => {
     const home = await mkdtemp(join(tmpdir(), "baliclaw-bootstrap-tg-"));
     const paths = getAppPaths(home);
+    const ipcServer = {
+      start: vi.fn<() => Promise<void>>().mockResolvedValue(),
+      stop: vi.fn<() => Promise<void>>().mockResolvedValue()
+    } as never;
     const telegramService = {
       start: vi.fn<() => Promise<void>>().mockResolvedValue(),
       stop: vi.fn<() => Promise<void>>().mockResolvedValue()
@@ -72,6 +81,7 @@ describe("bootstrap", () => {
     try {
       const context = await bootstrap({
         paths,
+        ipcServer,
         telegramService,
         configService: {
           load: vi.fn<() => Promise<AppConfig>>().mockResolvedValue({
@@ -89,6 +99,7 @@ describe("bootstrap", () => {
       await context.shutdownController.shutdown();
 
       expect(telegramService.stop).toHaveBeenCalledTimes(1);
+      expect(ipcServer.stop).toHaveBeenCalledTimes(1);
     } finally {
       await rm(home, { recursive: true, force: true });
     }
@@ -130,6 +141,10 @@ describe("runDaemon", () => {
         onStarted: () => {
           processSource.emit("SIGTERM");
         },
+        ipcServer: {
+          start: vi.fn<() => Promise<void>>().mockResolvedValue(),
+          stop: vi.fn<() => Promise<void>>().mockResolvedValue()
+        } as never,
         processSource,
         configService: {
           load: vi.fn<() => Promise<AppConfig>>().mockResolvedValue(defaultConfig)

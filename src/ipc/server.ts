@@ -2,6 +2,8 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { mkdir, stat, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { Logger } from "pino";
+import { appConfigSchema } from "../config/schema.js";
+import { ConfigService } from "../config/service.js";
 import { getAppPaths, type AppPaths } from "../config/paths.js";
 import { getLogger } from "../shared/logger.js";
 import type { AppStatus } from "../shared/types.js";
@@ -10,18 +12,21 @@ import type { PingResponse, IpcErrorResponse } from "./schema.js";
 export interface IpcServerOptions {
   paths?: AppPaths;
   logger?: Logger;
+  configService?: ConfigService;
   getStatus?: () => Promise<AppStatus> | AppStatus;
 }
 
 export class IpcServer {
   private readonly paths: AppPaths;
   private readonly logger: Logger;
+  private readonly configService: ConfigService;
   private readonly resolveStatus: () => Promise<AppStatus> | AppStatus;
   private server: Server | null = null;
 
   constructor(options: IpcServerOptions = {}) {
     this.paths = options.paths ?? getAppPaths();
     this.logger = options.logger ?? getLogger("ipc");
+    this.configService = options.configService ?? new ConfigService(this.paths);
     this.resolveStatus = options.getStatus ?? (() => ({
       ok: true,
       service: "baliclaw",
@@ -102,6 +107,18 @@ export class IpcServer {
         return;
       }
 
+      if (method === "GET" && url.pathname === "/v1/config") {
+        this.writeJson(response, 200, await this.configService.load());
+        return;
+      }
+
+      if (method === "POST" && url.pathname === "/v1/config/set") {
+        const body = appConfigSchema.parse(await this.readJsonBody(request));
+        await this.configService.save(body);
+        this.writeJson(response, 200, await this.configService.load());
+        return;
+      }
+
       this.writeJson(response, 404, {
         ok: false,
         error: {
@@ -125,6 +142,17 @@ export class IpcServer {
     response.statusCode = statusCode;
     response.setHeader("content-type", "application/json; charset=utf-8");
     response.end(`${JSON.stringify(payload)}\n`);
+  }
+
+  private async readJsonBody(request: IncomingMessage): Promise<unknown> {
+    const chunks: string[] = [];
+
+    for await (const chunk of request) {
+      chunks.push(chunk.toString());
+    }
+
+    const raw = chunks.join("").trim();
+    return raw.length === 0 ? {} : JSON.parse(raw);
   }
 }
 

@@ -1,12 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { IpcClient } from "../src/ipc/client.js";
 import { AppError, appErrorCodes } from "../src/shared/errors.js";
+import { getAppPaths } from "../src/config/paths.js";
+import type { AppConfig } from "../src/config/schema.js";
 
 describe("IpcClient", () => {
-  it("returns a shared AppStatus payload for valid responses", async () => {
+  it("returns shared AppStatus payloads for valid socket responses", async () => {
     const client = new IpcClient({
-      async getStatus() {
-        return { ok: true, service: "baliclaw", version: "test" };
+      requestJson: async (path) => {
+        if (path === "/v1/status") {
+          return {
+            statusCode: 200,
+            body: { ok: true, service: "baliclaw", version: "test" }
+          };
+        }
+
+        throw new Error(`unexpected path: ${path}`);
       }
     });
 
@@ -19,8 +28,11 @@ describe("IpcClient", () => {
 
   it("throws AppError with centralized code for invalid responses", async () => {
     const client = new IpcClient({
-      async getStatus() {
-        return { ok: true, service: "other", version: "test" } as unknown as { ok: true; service: "baliclaw"; version: string };
+      requestJson: async () => {
+        return {
+          statusCode: 200,
+          body: { ok: true, service: "other", version: "test" } as unknown as { ok: true; service: "baliclaw"; version: string }
+        };
       }
     });
 
@@ -28,5 +40,60 @@ describe("IpcClient", () => {
       name: "AppError",
       code: appErrorCodes.ipcInvalidResponse
     });
+  });
+
+  it("fails immediately when the daemon socket is unavailable", async () => {
+    const client = new IpcClient({
+      paths: getAppPaths("/tmp/definitely-missing-home")
+    });
+
+    await expect(client.getStatus()).rejects.toMatchObject<AppError>({
+      code: appErrorCodes.ipcUnavailable,
+      message: "BaliClaw daemon is not running"
+    });
+  });
+
+  it("supports config get and set over the shared transport", async () => {
+    const config: AppConfig = {
+      telegram: {
+        enabled: false,
+        botToken: ""
+      },
+      runtime: {
+        workingDirectory: "/tmp/baliclaw"
+      },
+      tools: {
+        availableTools: ["Bash"]
+      },
+      skills: {
+        enabled: true,
+        directories: []
+      },
+      logging: {
+        level: "info"
+      }
+    };
+    const client = new IpcClient({
+      requestJson: async (path, init) => {
+        if (path === "/v1/config" && init?.method !== "POST") {
+          return {
+            statusCode: 200,
+            body: config
+          };
+        }
+
+        if (path === "/v1/config/set" && init?.method === "POST") {
+          return {
+            statusCode: 200,
+            body: init.body
+          };
+        }
+
+        throw new Error(`unexpected path: ${path}`);
+      }
+    });
+
+    await expect(client.getConfig()).resolves.toEqual(config);
+    await expect(client.setConfig(config)).resolves.toEqual(config);
   });
 });

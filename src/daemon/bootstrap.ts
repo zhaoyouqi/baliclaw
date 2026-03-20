@@ -38,7 +38,8 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     paths,
     logger: getLogger("ipc", {
       level: config.logging.level
-    })
+    }),
+    configService
   });
   const telegramService = options.telegramService ?? new TelegramService();
   const shutdownController = createShutdownController(logger);

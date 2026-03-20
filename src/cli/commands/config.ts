@@ -1,7 +1,6 @@
-import { ConfigService } from "../../config/service.js";
+import { createCliClient } from "../client.js";
 
 export async function runConfigGetCommand(): Promise<string> {
-  const config = await new ConfigService().load();
+  const config = await createCliClient().getConfig();
   return JSON.stringify(config, null, 2);
 }
-

@@ -1,18 +1,18 @@
 export class KeyedQueue {
   private readonly tails = new Map<string, Promise<void>>();
 
-  enqueue(key: string, task: () => Promise<void>): Promise<void> {
+  enqueue<T>(key: string, task: () => Promise<T>): Promise<T> {
     const previous = this.tails.get(key) ?? Promise.resolve();
     const next = previous.then(task, task);
-    this.tails.set(
-      key,
-      next.finally(() => {
-        if (this.tails.get(key) === next) {
-          this.tails.delete(key);
-        }
-      })
-    );
+    const tail = next.then(
+      () => undefined,
+      () => undefined
+    ).finally(() => {
+      if (this.tails.get(key) === tail) {
+        this.tails.delete(key);
+      }
+    });
+    this.tails.set(key, tail);
     return next;
   }
 }
-

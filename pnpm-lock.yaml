@@ -9,7 +9,7 @@ importers:
   .:
     dependencies:
       '@anthropic-ai/claude-agent-sdk':
-        specifier: latest
+        specifier: 0.2.72
         version: 0.2.72(zod@4.3.6)
       chokidar:
         specifier: ^4.0.3

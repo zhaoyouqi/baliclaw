@@ -4,11 +4,11 @@ import { buildTelegramDirectSessionId } from "../session/stable-key.js";
 import { queryAgent } from "./sdk.js";
 
 export class AgentService {
-  async handleMessage(message: InboundMessage, cwd: string): Promise<string> {
+  async handleMessage(message: InboundMessage, cwd: string, sessionId = buildTelegramDirectSessionId(message)): Promise<string> {
     try {
       return await queryAgent({
         prompt: message.text,
-        sessionId: buildTelegramDirectSessionId(message),
+        sessionId,
         cwd
       });
     } catch (error) {

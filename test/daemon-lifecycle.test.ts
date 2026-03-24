@@ -474,6 +474,127 @@ describe("bootstrap", () => {
       await rm(home, { recursive: true, force: true });
     }
   });
+
+  it("passes the configured cwd into concurrent approved sessions without cross-session pollution", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-bootstrap-concurrent-cwd-"));
+    const paths = getAppPaths(home);
+    const bot = new FakeTelegramBot();
+    const sendText = vi.fn<() => Promise<void>>().mockResolvedValue();
+    const pairingService = {
+      isApprovedSender: vi.fn().mockResolvedValue(true),
+      getOrCreatePendingRequest: vi.fn()
+    } as never;
+    const pendingResolvers = new Map<string, () => void>();
+    const callOrder: string[] = [];
+    const agentService = {
+      handleMessage: vi.fn(async (_message: InboundMessage, options: { cwd: string; sessionId?: string }) => {
+        callOrder.push(`start:${options.sessionId}`);
+        await new Promise<void>((resolve) => {
+          pendingResolvers.set(options.sessionId ?? "", resolve);
+        });
+        callOrder.push(`end:${options.sessionId}`);
+        return `reply:${options.sessionId}`;
+      })
+    } as never;
+
+    try {
+      await bootstrap({
+        paths,
+        telegramBot: bot,
+        sendText,
+        pairingService,
+        agentService,
+        ipcServer: {
+          start: vi.fn<() => Promise<void>>().mockResolvedValue(),
+          stop: vi.fn<() => Promise<void>>().mockResolvedValue()
+        } as never,
+        configService: {
+          load: vi.fn<() => Promise<AppConfig>>().mockResolvedValue({
+            ...defaultConfig,
+            telegram: {
+              enabled: true,
+              botToken: "secret"
+            },
+            runtime: {
+              workingDirectory: "/tmp/shared-runtime"
+            }
+          })
+        } as never
+      });
+
+      bot.handler?.({
+        update: {
+          message: {
+            from: { id: 41 },
+            chat: { id: 41, type: "private" },
+            text: "first"
+          }
+        }
+      });
+      bot.handler?.({
+        update: {
+          message: {
+            from: { id: 42 },
+            chat: { id: 42, type: "private" },
+            text: "second"
+          }
+        }
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(agentService.handleMessage).toHaveBeenCalledTimes(2);
+      expect(agentService.handleMessage).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ senderId: "41", text: "first" }),
+        {
+          cwd: "/tmp/shared-runtime",
+          sessionId: "telegram:default:direct:41",
+          skillDirectories: [],
+          tools: ["Bash", "Read", "Write", "Edit"]
+        }
+      );
+      expect(agentService.handleMessage).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ senderId: "42", text: "second" }),
+        {
+          cwd: "/tmp/shared-runtime",
+          sessionId: "telegram:default:direct:42",
+          skillDirectories: [],
+          tools: ["Bash", "Read", "Write", "Edit"]
+        }
+      );
+      expect(callOrder).toEqual([
+        "start:telegram:default:direct:41",
+        "start:telegram:default:direct:42"
+      ]);
+
+      pendingResolvers.get("telegram:default:direct:41")?.();
+      pendingResolvers.get("telegram:default:direct:42")?.();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(sendText).toHaveBeenCalledWith(
+        {
+          channel: "telegram",
+          accountId: "default",
+          chatType: "direct",
+          conversationId: "41"
+        },
+        "reply:telegram:default:direct:41"
+      );
+      expect(sendText).toHaveBeenCalledWith(
+        {
+          channel: "telegram",
+          accountId: "default",
+          chatType: "direct",
+          conversationId: "42"
+        },
+        "reply:telegram:default:direct:42"
+      );
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("shutdown", () => {

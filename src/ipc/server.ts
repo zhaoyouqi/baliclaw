@@ -20,6 +20,7 @@ export interface IpcServerOptions {
   logger?: Logger;
   configService?: ConfigService;
   pairingService?: PairingService;
+  reloadConfig?: () => Promise<object>;
   getStatus?: () => Promise<AppStatus> | AppStatus;
 }
 
@@ -28,6 +29,7 @@ export class IpcServer {
   private readonly logger: Logger;
   private readonly configService: ConfigService;
   private readonly pairingService: PairingService;
+  private readonly reloadConfig: (() => Promise<object>) | undefined;
   private readonly resolveStatus: () => Promise<AppStatus> | AppStatus;
   private server: Server | null = null;
 
@@ -36,6 +38,7 @@ export class IpcServer {
     this.logger = options.logger ?? getLogger("ipc");
     this.configService = options.configService ?? new ConfigService(this.paths);
     this.pairingService = options.pairingService ?? new PairingService();
+    this.reloadConfig = options.reloadConfig;
     this.resolveStatus = options.getStatus ?? (() => ({
       ok: true,
       service: "baliclaw",
@@ -145,7 +148,13 @@ export class IpcServer {
       if (method === "POST" && url.pathname === "/v1/config/set") {
         const body = appConfigSchema.parse(await this.readJsonBody(request));
         await this.configService.save(body);
-        this.writeJson(response, 200, await this.configService.load());
+        this.writeJson(
+          response,
+          200,
+          this.reloadConfig
+            ? await this.reloadConfig()
+            : await this.configService.load()
+        );
         return;
       }
 

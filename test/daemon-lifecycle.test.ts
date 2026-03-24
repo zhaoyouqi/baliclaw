@@ -295,6 +295,185 @@ describe("bootstrap", () => {
       await rm(home, { recursive: true, force: true });
     }
   });
+
+  it("hot-applies updated runtime config to subsequent agent turns", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-bootstrap-reload-runtime-"));
+    const paths = getAppPaths(home);
+    const bot = new FakeTelegramBot();
+    const sendText = vi.fn<() => Promise<void>>().mockResolvedValue();
+    const pairingService = {
+      isApprovedSender: vi.fn().mockResolvedValue(true),
+      getOrCreatePendingRequest: vi.fn()
+    } as never;
+    const agentService = {
+      handleMessage: vi.fn().mockResolvedValue("agent reply")
+    } as never;
+    const loadedConfigs: AppConfig[] = [
+      {
+        ...defaultConfig,
+        telegram: {
+          enabled: true,
+          botToken: "token-1"
+        },
+        runtime: {
+          workingDirectory: "/tmp/runtime-1",
+          model: "claude-sonnet",
+          maxTurns: 4,
+          systemPromptFile: "/tmp/system-1.md"
+        },
+        skills: {
+          enabled: true,
+          directories: ["/tmp/skills-1"]
+        },
+        tools: {
+          availableTools: ["Read"]
+        },
+        logging: {
+          level: "info"
+        }
+      },
+      {
+        ...defaultConfig,
+        telegram: {
+          enabled: true,
+          botToken: "token-1"
+        },
+        runtime: {
+          workingDirectory: "/tmp/runtime-2",
+          model: "claude-opus",
+          maxTurns: 9,
+          systemPromptFile: "/tmp/system-2.md"
+        },
+        skills: {
+          enabled: true,
+          directories: ["/tmp/skills-2"]
+        },
+        tools: {
+          availableTools: ["Bash", "Write"]
+        },
+        logging: {
+          level: "debug"
+        }
+      }
+    ];
+    const configService = {
+      load: vi.fn<() => Promise<AppConfig>>().mockImplementation(async () => loadedConfigs.shift() ?? defaultConfig)
+    } as never;
+
+    try {
+      const context = await bootstrap({
+        paths,
+        configService,
+        telegramBot: bot,
+        sendText,
+        pairingService,
+        agentService,
+        ipcServer: {
+          start: vi.fn<() => Promise<void>>().mockResolvedValue(),
+          stop: vi.fn<() => Promise<void>>().mockResolvedValue()
+        } as never
+      });
+
+      bot.handler?.({
+        update: {
+          message: {
+            from: { id: 42 },
+            chat: { id: 42, type: "private" },
+            text: "before reload"
+          }
+        }
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      await context.reloadService.reload();
+
+      bot.handler?.({
+        update: {
+          message: {
+            from: { id: 42 },
+            chat: { id: 42, type: "private" },
+            text: "after reload"
+          }
+        }
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(agentService.handleMessage).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ text: "before reload" }),
+        {
+          cwd: "/tmp/runtime-1",
+          sessionId: "telegram:default:direct:42",
+          model: "claude-sonnet",
+          maxTurns: 4,
+          systemPromptFile: "/tmp/system-1.md",
+          skillDirectories: ["/tmp/skills-1"],
+          tools: ["Read"]
+        }
+      );
+      expect(agentService.handleMessage).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ text: "after reload" }),
+        {
+          cwd: "/tmp/runtime-2",
+          sessionId: "telegram:default:direct:42",
+          model: "claude-opus",
+          maxTurns: 9,
+          systemPromptFile: "/tmp/system-2.md",
+          skillDirectories: ["/tmp/skills-2"],
+          tools: ["Bash", "Write"]
+        }
+      );
+      expect(context.logger.level).toBe("debug");
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("restarts telegram polling when the bot token changes on reload", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-bootstrap-reload-telegram-"));
+    const paths = getAppPaths(home);
+    const telegramService = {
+      start: vi.fn<() => Promise<void>>().mockResolvedValue(),
+      stop: vi.fn<() => Promise<void>>().mockResolvedValue()
+    } as never;
+    const configService = {
+      load: vi.fn<() => Promise<AppConfig>>()
+        .mockResolvedValueOnce({
+          ...defaultConfig,
+          telegram: {
+            enabled: true,
+            botToken: "token-1"
+          }
+        })
+        .mockResolvedValueOnce({
+          ...defaultConfig,
+          telegram: {
+            enabled: true,
+            botToken: "token-2"
+          }
+        })
+    } as never;
+
+    try {
+      const context = await bootstrap({
+        paths,
+        configService,
+        telegramService,
+        ipcServer: {
+          start: vi.fn<() => Promise<void>>().mockResolvedValue(),
+          stop: vi.fn<() => Promise<void>>().mockResolvedValue()
+        } as never
+      });
+
+      await context.reloadService.reload();
+
+      expect(telegramService.start).toHaveBeenCalledTimes(2);
+      expect(telegramService.stop).toHaveBeenCalledTimes(1);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("shutdown", () => {

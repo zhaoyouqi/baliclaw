@@ -7,6 +7,8 @@ export interface AppPaths {
   configFile: string;
   socketFile: string;
   pairingDir: string;
+  sessionDir: string;
+  claudeSessionMapFile: string;
   pendingPairingFile: string;
   allowlistFile: string;
   logsDir: string;
@@ -16,6 +18,7 @@ export interface AppPaths {
 export function getAppPaths(home = homedir()): AppPaths {
   const rootDir = join(home, ".baliclaw");
   const pairingDir = join(rootDir, "pairing");
+  const sessionDir = join(rootDir, "sessions");
   const logsDir = join(rootDir, "logs");
 
   return {
@@ -23,6 +26,8 @@ export function getAppPaths(home = homedir()): AppPaths {
     configFile: join(rootDir, "baliclaw.json5"),
     socketFile: join(rootDir, "baliclaw.sock"),
     pairingDir,
+    sessionDir,
+    claudeSessionMapFile: join(sessionDir, "claude-sessions.json"),
     pendingPairingFile: join(pairingDir, "telegram-pending.json"),
     allowlistFile: join(pairingDir, "telegram-allowlist.json"),
     logsDir,
@@ -34,6 +39,7 @@ export async function ensureStateDirectories(paths: AppPaths = getAppPaths()): P
   await Promise.all([
     mkdir(paths.rootDir, { recursive: true }),
     mkdir(paths.pairingDir, { recursive: true }),
+    mkdir(paths.sessionDir, { recursive: true }),
     mkdir(paths.logsDir, { recursive: true })
   ]);
 }

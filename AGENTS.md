@@ -22,7 +22,7 @@ Current Phase 1 implementation is centered around:
 
 Use `pnpm` exclusively for this repository. Do not use `bun install`, `npm install`, or commit lockfiles from other package managers.
 
-Before running any `node`, `pnpm`, `tsc`, `tsx`, or other Node.js-based command, run `nvm use` in the repository root so the shell uses the version declared in `.nvmrc`.
+When manually debugging or running BaliClaw itself with local Node commands, run `nvm use` in the repository root first so the shell uses the version declared in `.nvmrc`. Do not treat this as a blanket requirement for every shell command in the workspace.
 
 - `pnpm install`: install and lock dependencies.
 - `pnpm build`: compile TypeScript to `dist/`.
@@ -91,9 +91,12 @@ Current local state and control files include:
 - `~/.baliclaw/baliclaw.sock`
 - `~/.baliclaw/pairing/telegram-pending.json`
 - `~/.baliclaw/pairing/telegram-allowlist.json`
+- `~/.baliclaw/sessions/claude-sessions.json`
 
 Additional runtime notes:
 
 - all config mutations should continue to go through daemon IPC; CLI must not write config or pairing files directly
 - `POST /v1/config/set` already triggers in-memory reload, so avoid adding extra manual refresh steps around it
 - config file watching is enabled in the daemon; updates to logging, runtime prompt/tool config, and Telegram token/enabled state are expected to hot-apply
+- Telegram proxying is configured at the BaliClaw daemon / Telegram transport boundary; do not rely on proxy env vars being inherited by Claude child processes
+- runtime session continuity now depends on the `business sessionId -> Claude session_id` mapping stored under `~/.baliclaw/sessions/`

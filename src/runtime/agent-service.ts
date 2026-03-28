@@ -3,6 +3,7 @@ import type { InboundMessage } from "../shared/types.js";
 import { buildTelegramDirectSessionId } from "../session/stable-key.js";
 import { getLogger } from "../shared/logger.js";
 import { queryAgent, type QueryRequest } from "./sdk.js";
+import { ClaudeSessionMapStore } from "./session-map-store.js";
 
 export interface AgentRunOptions {
   cwd: string;
@@ -17,6 +18,7 @@ export interface AgentRunOptions {
 export interface AgentServiceDependencies {
   logger?: Logger;
   runQueryAgent?: typeof queryAgent;
+  sessionMapStore?: Pick<ClaudeSessionMapStore, "get" | "set">;
 }
 
 const genericAgentFailureMessage = "Sorry, I ran into an internal error while processing your request.";
@@ -25,10 +27,12 @@ const maxTurnsFailureMessage = "Sorry, I couldn't finish that within the allowed
 export class AgentService {
   private readonly logger: Logger;
   private readonly runQueryAgent: typeof queryAgent;
+  private readonly sessionMapStore: Pick<ClaudeSessionMapStore, "get" | "set">;
 
   constructor(dependencies: AgentServiceDependencies = {}) {
     this.logger = dependencies.logger ?? getLogger("agent");
     this.runQueryAgent = dependencies.runQueryAgent ?? queryAgent;
+    this.sessionMapStore = dependencies.sessionMapStore ?? new ClaudeSessionMapStore();
   }
 
   async handleMessage(
@@ -39,11 +43,16 @@ export class AgentService {
     const options = normalizeAgentRunOptions(message, optionsOrCwd, sessionIdOverride);
 
     try {
+      const resumeSessionId = await this.sessionMapStore.get(options.sessionId);
       const request: QueryRequest = {
         prompt: message.text,
         sessionId: options.sessionId,
         cwd: options.cwd
       };
+
+      if (resumeSessionId) {
+        request.resumeSessionId = resumeSessionId;
+      }
 
       if (options.model) {
         request.model = options.model;
@@ -62,6 +71,7 @@ export class AgentService {
       }
 
       const result = await this.runQueryAgent(request);
+      await this.sessionMapStore.set(options.sessionId, result.sessionId);
       return result.text;
     } catch (error) {
       this.logger.error(

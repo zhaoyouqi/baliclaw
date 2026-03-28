@@ -7,6 +7,7 @@ describe("queryAgent", () => {
       prompt: string;
       options?: {
         cwd?: string;
+        env?: Record<string, string | undefined>;
         sessionId?: string;
         maxTurns?: number;
         permissionMode?: string;
@@ -62,6 +63,7 @@ describe("queryAgent", () => {
 
     expect(result).toEqual({
       text: "done",
+      sessionId: "session",
       usage: {
         totalCostUsd: 0.25,
         turns: 2
@@ -69,19 +71,28 @@ describe("queryAgent", () => {
     });
     expect(query).toHaveBeenCalledWith({
       prompt: "hello",
-      options: {
+      options: expect.objectContaining({
         cwd: "/tmp/project",
+        env: expect.not.objectContaining({
+          http_proxy: expect.anything(),
+          HTTP_PROXY: expect.anything(),
+          https_proxy: expect.anything(),
+          HTTPS_PROXY: expect.anything(),
+          all_proxy: expect.anything(),
+          ALL_PROXY: expect.anything()
+        }),
         maxTurns: 12,
-        sessionId: "telegram:default:direct:42",
+        sessionId: "17bb8bb2-b071-55fd-a53f-95e420de631f",
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
         tools: ["Read", "Bash"],
+        stderr: expect.any(Function),
         systemPrompt: {
           type: "preset",
           preset: "claude_code",
           append: "assembled prompt"
         }
-      }
+      })
     });
   });
 
@@ -120,21 +131,73 @@ describe("queryAgent", () => {
 
     expect(query).toHaveBeenCalledWith({
       prompt: "hello",
-      options: {
+      options: expect.objectContaining({
         cwd: "/tmp/project",
-        model: undefined,
+        env: expect.not.objectContaining({
+          http_proxy: expect.anything(),
+          HTTP_PROXY: expect.anything(),
+          https_proxy: expect.anything(),
+          HTTPS_PROXY: expect.anything(),
+          all_proxy: expect.anything(),
+          ALL_PROXY: expect.anything()
+        }),
         maxTurns: 8,
-        sessionId: "telegram:default:direct:42",
+        sessionId: "17bb8bb2-b071-55fd-a53f-95e420de631f",
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
         tools: ["Bash", "Read", "Write", "Edit"],
+        stderr: expect.any(Function),
         systemPrompt: {
           type: "preset",
           preset: "claude_code",
           append: "prompt"
         }
-      }
+      })
     });
+  });
+
+  it("uses resume instead of opening a new Claude session when a previous Claude session id exists", async () => {
+    const query = vi.fn(async function* () {
+      yield {
+        type: "result" as const,
+        subtype: "success" as const,
+        duration_ms: 1,
+        duration_api_ms: 1,
+        is_error: false,
+        num_turns: 1,
+        result: "ok",
+        stop_reason: null,
+        total_cost_usd: 0,
+        usage: {} as never,
+        modelUsage: {},
+        permission_denials: [],
+        uuid: "uuid",
+        session_id: "existing-claude-session"
+      };
+    });
+
+    await queryAgent(
+      {
+        prompt: "hello",
+        sessionId: "telegram:default:direct:42",
+        resumeSessionId: "existing-claude-session",
+        cwd: "/tmp/project"
+      },
+      {
+        buildSystemPrompt: vi.fn().mockResolvedValue("prompt"),
+        loadPromptOnlySkills: vi.fn().mockResolvedValue([]),
+        query: query as never
+      }
+    );
+
+    expect(query).toHaveBeenCalledWith({
+      prompt: "hello",
+      options: expect.objectContaining({
+        cwd: "/tmp/project",
+        resume: "existing-claude-session"
+      })
+    });
+    expect(query.mock.calls[0]?.[0].options).not.toHaveProperty("sessionId");
   });
 
   it("throws when the final SDK result is an error", async () => {

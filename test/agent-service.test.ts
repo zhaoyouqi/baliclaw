@@ -17,10 +17,16 @@ function makeMessage(text: string, senderId = "42"): InboundMessage {
 describe("AgentService", () => {
   it("uses a stable session id and the provided cwd when calling the SDK wrapper", async () => {
     const queryAgent = vi.fn().mockResolvedValue({
-      text: "done"
+      text: "done",
+      sessionId: "claude-session-1"
     });
+    const sessionMapStore = {
+      get: vi.fn().mockResolvedValue(undefined),
+      set: vi.fn().mockResolvedValue(undefined)
+    };
     const service = new AgentService({
-      runQueryAgent: queryAgent
+      runQueryAgent: queryAgent,
+      sessionMapStore
     });
 
     await expect(service.handleMessage(makeMessage("hello"), "/tmp/project")).resolves.toBe("done");
@@ -30,14 +36,24 @@ describe("AgentService", () => {
       sessionId: "telegram:default:direct:42",
       cwd: "/tmp/project"
     });
+    expect(sessionMapStore.set).toHaveBeenCalledWith(
+      "telegram:default:direct:42",
+      "claude-session-1"
+    );
   });
 
   it("passes advanced runtime options through to the SDK wrapper", async () => {
     const queryAgent = vi.fn().mockResolvedValue({
-      text: "done"
+      text: "done",
+      sessionId: "claude-session-2"
     });
+    const sessionMapStore = {
+      get: vi.fn().mockResolvedValue("claude-session-existing"),
+      set: vi.fn().mockResolvedValue(undefined)
+    };
     const service = new AgentService({
-      runQueryAgent: queryAgent
+      runQueryAgent: queryAgent,
+      sessionMapStore
     });
 
     await service.handleMessage(makeMessage("hello"), {
@@ -53,6 +69,7 @@ describe("AgentService", () => {
     expect(queryAgent).toHaveBeenCalledWith({
       prompt: "hello",
       sessionId: "custom-session",
+      resumeSessionId: "claude-session-existing",
       cwd: "/tmp/project",
       model: "claude-sonnet",
       maxTurns: 12,
@@ -60,6 +77,7 @@ describe("AgentService", () => {
       skillDirectories: ["/tmp/skills"],
       tools: ["Read", "Bash"]
     });
+    expect(sessionMapStore.set).toHaveBeenCalledWith("custom-session", "claude-session-2");
   });
 
   it("returns a readable max-turns failure message and logs the error", async () => {
@@ -67,7 +85,11 @@ describe("AgentService", () => {
     const logger = createLogger({ subsystem: "agent", destination });
     const service = new AgentService({
       logger,
-      runQueryAgent: vi.fn().mockRejectedValue(new Error("Claude Agent SDK failed: max turns reached"))
+      runQueryAgent: vi.fn().mockRejectedValue(new Error("Claude Agent SDK failed: max turns reached")),
+      sessionMapStore: {
+        get: vi.fn().mockResolvedValue(undefined),
+        set: vi.fn()
+      }
     });
 
     await expect(service.handleMessage(makeMessage("hello"), "/tmp/project")).resolves.toBe(
@@ -81,7 +103,11 @@ describe("AgentService", () => {
     const logger = createLogger({ subsystem: "agent", destination });
     const service = new AgentService({
       logger,
-      runQueryAgent: vi.fn().mockRejectedValue(new Error("network broke"))
+      runQueryAgent: vi.fn().mockRejectedValue(new Error("network broke")),
+      sessionMapStore: {
+        get: vi.fn().mockResolvedValue(undefined),
+        set: vi.fn()
+      }
     });
 
     await expect(service.handleMessage(makeMessage("hello"), "/tmp/project")).resolves.toBe(

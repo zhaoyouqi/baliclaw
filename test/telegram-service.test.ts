@@ -8,7 +8,9 @@ interface RegisteredHandler {
 
 class FakeTelegramBot {
   handler: RegisteredHandler | undefined;
-  start = vi.fn(async () => undefined);
+  start = vi.fn(async (options?: { onStart?: () => unknown }) => {
+    await options?.onStart?.();
+  });
   stop = vi.fn(async () => undefined);
 
   on(_filter: "message", handler: RegisteredHandler): void {
@@ -28,6 +30,24 @@ describe("TelegramService", () => {
 
     expect(bot.start).toHaveBeenCalledTimes(1);
     expect(bot.stop).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not block startup while long polling is running", async () => {
+    const bot = new FakeTelegramBot();
+    let resolveStart: (() => void) | undefined;
+    bot.start = vi.fn(async (options?: { onStart?: () => unknown }) => {
+      await options?.onStart?.();
+      await new Promise<void>((resolve) => {
+        resolveStart = resolve;
+      });
+    });
+    const service = new TelegramService({ bot, token: "unused" });
+
+    await expect(service.start()).resolves.toBeUndefined();
+    expect(bot.start).toHaveBeenCalledTimes(1);
+
+    resolveStart?.();
+    await service.stop();
   });
 
   it("enqueues only private text messages", async () => {

@@ -1,5 +1,6 @@
 import { Api } from "grammy";
 import type { DeliveryTarget } from "../shared/types.js";
+import { createTelegramClientOptions } from "./proxy.js";
 
 export interface TelegramTextApi {
   sendMessage(chatId: number | string, text: string): Promise<unknown>;
@@ -39,7 +40,7 @@ export async function sendTelegramText(
 }
 
 export function createTelegramApi(token: string): TelegramTextApi {
-  return new Api(token);
+  return new Api(token, createTelegramClientOptions());
 }
 
 function validateTarget(target: DeliveryTarget): void {

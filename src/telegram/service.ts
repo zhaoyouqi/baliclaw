@@ -1,8 +1,9 @@
-import { Bot, GrammyError, HttpError } from "grammy";
+import { Bot, GrammyError, HttpError, type PollingOptions } from "grammy";
 import type { Logger } from "pino";
 import type { PairingService } from "../auth/pairing-service.js";
 import { getLogger } from "../shared/logger.js";
 import type { DeliveryTarget, InboundMessage } from "../shared/types.js";
+import { createTelegramClientOptions } from "./proxy.js";
 import {
   normalizeTelegramUpdate,
   type TelegramUpdate
@@ -14,7 +15,7 @@ export interface TelegramServiceContext {
 
 export interface TelegramPollingBot {
   on(filter: "message", handler: (context: TelegramServiceContext) => MaybePromise<unknown>): void;
-  start(): Promise<void>;
+  start(options?: PollingOptions): Promise<void>;
   stop(): Promise<void>;
 }
 
@@ -36,6 +37,7 @@ export class TelegramService {
   private readonly pairingService: Pick<PairingService, "getOrCreatePendingRequest" | "isApprovedSender"> | undefined;
   private readonly sendText: (target: DeliveryTarget, text: string) => MaybePromise<unknown>;
   private readonly logger: Logger;
+  private pollingTask: Promise<void> | null = null;
   private started = false;
 
   constructor(options: TelegramServiceOptions = {}) {
@@ -102,7 +104,7 @@ export class TelegramService {
   }
 
   async start(): Promise<void> {
-    if (this.started) {
+    if (this.started || this.pollingTask) {
       return;
     }
 
@@ -114,28 +116,42 @@ export class TelegramService {
         this.registerMessageHandler(bot);
       }
 
-      await bot.start();
-      this.started = true;
-      this.logger.info("telegram polling started");
+      this.pollingTask = bot.start({
+        onStart: async () => {
+          this.started = true;
+          this.logger.info("telegram polling started");
+        }
+      });
+
+      void this.pollingTask.catch((error) => {
+        this.pollingTask = null;
+        this.started = false;
+        this.logger.error({ err: error }, "telegram polling exited with error");
+      });
     } catch (error) {
+      this.pollingTask = null;
+      this.started = false;
       this.logger.error({ err: error }, "failed to start telegram polling");
       throw toTelegramServiceError(error);
     }
   }
 
   async stop(): Promise<void> {
-    if (!this.started) {
+    if (!this.started && !this.pollingTask) {
       return;
     }
 
     await this.bot?.stop();
+    this.pollingTask = null;
     this.started = false;
     this.logger.info("telegram polling stopped");
   }
 }
 
 export function createTelegramBot(token: string): TelegramPollingBot {
-  return new Bot(token);
+  return new Bot(token, {
+    client: createTelegramClientOptions()
+  });
 }
 
 function toTelegramServiceError(error: unknown): Error {

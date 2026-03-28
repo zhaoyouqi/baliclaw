@@ -42,6 +42,8 @@ This repository uses `.nvmrc`. Before running Node-based commands:
 nvm use
 ```
 
+In practice, this matters when you are manually debugging or running BaliClaw itself with local `node` / `pnpm` commands. It is not meant as a blanket requirement for every shell command in the workspace.
+
 ## Install
 
 ```bash
@@ -92,6 +94,8 @@ The daemon keeps local state under `~/.baliclaw/` and listens on:
 ```
 
 Stop it with `Ctrl+C` or `SIGTERM`.
+
+If your local network needs a proxy for Telegram, start the daemon with proxy env vars set for the daemon process. BaliClaw will use that for Telegram transport, but Claude child processes are intentionally started without inheriting those proxy vars.
 
 ## CLI Commands
 
@@ -162,6 +166,12 @@ Telegram pairing state is stored locally in:
 ```text
 ~/.baliclaw/pairing/telegram-pending.json
 ~/.baliclaw/pairing/telegram-allowlist.json
+```
+
+Claude session continuity is stored in:
+
+```text
+~/.baliclaw/sessions/claude-sessions.json
 ```
 
 ## Development Notes

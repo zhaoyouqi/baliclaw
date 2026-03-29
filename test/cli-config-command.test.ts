@@ -112,4 +112,42 @@ describe("CLI config commands", () => {
       await rm(home, { recursive: true, force: true });
     }
   });
+
+  it("updates a single config path using the current daemon config as a base", async () => {
+    const client = {
+      getConfig: vi.fn<() => Promise<AppConfig>>().mockResolvedValue(config),
+      setConfig: vi.fn<(value: AppConfig) => Promise<AppConfig>>().mockImplementation(async (value) => value)
+    } as never;
+
+    const output = await runConfigSetCommand(
+      "8793336326:example-token",
+      { path: "channels.telegram.botToken" },
+      client
+    );
+
+    expect(client.getConfig).toHaveBeenCalledTimes(1);
+    expect(client.setConfig).toHaveBeenCalledWith({
+      ...config,
+      channels: {
+        telegram: {
+          enabled: false,
+          botToken: "8793336326:example-token"
+        }
+      }
+    });
+    expect(output).toContain("\"botToken\": \"8793336326:example-token\"");
+  });
+
+  it("rejects unknown config paths", async () => {
+    const client = {
+      getConfig: vi.fn<() => Promise<AppConfig>>().mockResolvedValue(config),
+      setConfig: vi.fn()
+    } as never;
+
+    await expect(
+      runConfigSetCommand("value", { path: "channels.telegram.missing" }, client)
+    ).rejects.toThrow("Unknown config path: channels.telegram.missing");
+
+    expect(client.setConfig).not.toHaveBeenCalled();
+  });
 });

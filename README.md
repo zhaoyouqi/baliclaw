@@ -104,6 +104,7 @@ After building, you can use the compiled CLI:
 ```bash
 node dist/cli/index.js status
 node dist/cli/index.js config get
+node dist/cli/index.js config set --path channels.telegram.botToken '<TOKEN>'
 node dist/cli/index.js pairing list telegram
 node dist/cli/index.js pairing approve telegram <CODE>
 ```
@@ -113,6 +114,7 @@ Current CLI command groups:
 - `status`
 - `config get`
 - `config set`
+- `config set --path <config.path> <value>`
 - `pairing list telegram`
 - `pairing approve telegram <CODE>`
 - `daemon start`

@@ -31,10 +31,11 @@ configCommand
 
 configCommand
   .command("set")
-  .description("Set the current config from inline JSON5 or a file")
-  .argument("[config]", "inline JSON5 payload")
+  .description("Set the current config from inline JSON5, a file, or a single config path")
+  .argument("[config]", "inline JSON5 payload or value when used with --path")
   .option("-f, --file <path>", "read the config payload from a file")
-  .action(async (config: string | undefined, options: { file?: string }) => {
+  .option("-p, --path <config.path>", "update a single config path, for example channels.telegram.botToken")
+  .action(async (config: string | undefined, options: { file?: string; path?: string }) => {
     console.log(await runConfigSetCommand(config, options));
   });
 

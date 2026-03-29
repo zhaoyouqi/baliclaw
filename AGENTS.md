@@ -39,6 +39,7 @@ Useful manual run commands:
 - `node dist/daemon/index.js`: start the daemon directly after `pnpm build`.
 - `node dist/cli/index.js status`: query daemon status over IPC.
 - `node dist/cli/index.js config get`: read current config over IPC.
+- `node dist/cli/index.js config set --path channels.telegram.botToken '<TOKEN>'`: update a single config field over IPC.
 - `node dist/cli/index.js pairing list telegram`: list pending Telegram pairing requests.
 - `node dist/cli/index.js pairing approve telegram <CODE>`: approve a pending Telegram pairing code.
 

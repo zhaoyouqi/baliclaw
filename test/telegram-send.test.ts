@@ -23,6 +23,18 @@ describe("createTelegramTextSender", () => {
     expect(sendMessage).toHaveBeenCalledWith("123456", "hello from baliclaw");
   });
 
+  it("splits long text into multiple Telegram messages", async () => {
+    const sendMessage = vi.fn().mockResolvedValue({ ok: true });
+    const sender = createTelegramTextSender({ sendMessage });
+    const longText = "a".repeat(4500);
+
+    await sender.sendText(directTarget, longText);
+
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    expect(sendMessage).toHaveBeenNthCalledWith(1, "123456", "a".repeat(4000));
+    expect(sendMessage).toHaveBeenNthCalledWith(2, "123456", "a".repeat(500));
+  });
+
   it("rejects unsupported targets before calling the Telegram API", async () => {
     const sendMessage = vi.fn().mockResolvedValue({ ok: true });
     const sender = createTelegramTextSender({ sendMessage });

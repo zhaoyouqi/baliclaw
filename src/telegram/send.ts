@@ -1,11 +1,16 @@
 import { Api } from "grammy";
 import type { DeliveryTarget } from "../shared/types.js";
+import { renderTelegramHtmlText, splitTelegramMarkdownChunks } from "./format.js";
 import { createTelegramClientOptions } from "./proxy.js";
 
 const TELEGRAM_TEXT_LIMIT = 4000;
 
 export interface TelegramTextApi {
-  sendMessage(chatId: number | string, text: string): Promise<unknown>;
+  sendMessage(
+    chatId: number | string,
+    text: string,
+    other?: { parse_mode?: "HTML" }
+  ): Promise<unknown>;
 }
 
 export class TelegramSendError extends Error {
@@ -22,8 +27,14 @@ export function createTelegramTextSender(api: TelegramTextApi) {
       validateText(text);
 
       try {
-        for (const chunk of splitTelegramPlainTextChunks(text, TELEGRAM_TEXT_LIMIT)) {
-          await api.sendMessage(target.conversationId, chunk);
+        for (const chunk of splitTelegramMarkdownChunks(text, TELEGRAM_TEXT_LIMIT)) {
+          const htmlText = renderTelegramHtmlText(chunk);
+
+          try {
+            await api.sendMessage(target.conversationId, htmlText, { parse_mode: "HTML" });
+          } catch {
+            await api.sendMessage(target.conversationId, chunk);
+          }
         }
       } catch (error) {
         throw new TelegramSendError(
@@ -69,17 +80,6 @@ function validateText(text: string): void {
   if (text.length === 0) {
     throw new TelegramSendError("Telegram text message must not be empty");
   }
-}
-
-function splitTelegramPlainTextChunks(text: string, limit: number): string[] {
-  const normalizedLimit = Math.max(1, limit);
-  const chunks: string[] = [];
-
-  for (let start = 0; start < text.length; start += normalizedLimit) {
-    chunks.push(text.slice(start, start + normalizedLimit));
-  }
-
-  return chunks;
 }
 
 function formatError(error: unknown): string {

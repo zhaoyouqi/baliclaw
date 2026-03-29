@@ -20,7 +20,22 @@ describe("createTelegramTextSender", () => {
 
     await sendTelegramText(directTarget, "hello from baliclaw", { sendMessage });
 
-    expect(sendMessage).toHaveBeenCalledWith("123456", "hello from baliclaw");
+    expect(sendMessage).toHaveBeenCalledWith("123456", "hello from baliclaw", {
+      parse_mode: "HTML"
+    });
+  });
+
+  it("renders markdown as Telegram HTML", async () => {
+    const sendMessage = vi.fn().mockResolvedValue({ ok: true });
+    const sender = createTelegramTextSender({ sendMessage });
+
+    await sender.sendText(directTarget, "# Title\n- **bold** item\n`code`");
+
+    expect(sendMessage).toHaveBeenCalledWith(
+      "123456",
+      "<b>Title</b>\n• <b>bold</b> item\n<code>code</code>",
+      { parse_mode: "HTML" }
+    );
   });
 
   it("splits long text into multiple Telegram messages", async () => {
@@ -31,8 +46,26 @@ describe("createTelegramTextSender", () => {
     await sender.sendText(directTarget, longText);
 
     expect(sendMessage).toHaveBeenCalledTimes(2);
-    expect(sendMessage).toHaveBeenNthCalledWith(1, "123456", "a".repeat(4000));
-    expect(sendMessage).toHaveBeenNthCalledWith(2, "123456", "a".repeat(500));
+    expect(sendMessage).toHaveBeenNthCalledWith(1, "123456", "a".repeat(4000), {
+      parse_mode: "HTML"
+    });
+    expect(sendMessage).toHaveBeenNthCalledWith(2, "123456", "a".repeat(500), {
+      parse_mode: "HTML"
+    });
+  });
+
+  it("falls back to plain text when Telegram rejects HTML formatting", async () => {
+    const sendMessage = vi.fn()
+      .mockRejectedValueOnce(new Error("can't parse entities"))
+      .mockResolvedValueOnce({ ok: true });
+    const sender = createTelegramTextSender({ sendMessage });
+
+    await sender.sendText(directTarget, "_bad markdown_");
+
+    expect(sendMessage).toHaveBeenNthCalledWith(1, "123456", "<i>bad markdown</i>", {
+      parse_mode: "HTML"
+    });
+    expect(sendMessage).toHaveBeenNthCalledWith(2, "123456", "_bad markdown_");
   });
 
   it("rejects unsupported targets before calling the Telegram API", async () => {

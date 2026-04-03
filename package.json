@@ -1,5 +1,5 @@
 {
-  "name": "@zhaoyouqi/baliclaw",
+  "name": "@zhaoyuanjie/baliclaw",
   "version": "0.1.0",
   "description": "Local-first Telegram AI gateway built on Claude Agent SDK.",
   "type": "module",

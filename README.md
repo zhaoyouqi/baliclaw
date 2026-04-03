@@ -7,7 +7,7 @@ BaliClaw is a local-first AI gateway for Telegram DM workflows.
 Install:
 
 ```bash
-npm install -g @zhaoyouqi/baliclaw
+npm install -g @zhaoyuanjie/baliclaw
 ```
 
 Before starting BaliClaw, make sure your Claude settings are already configured on this machine. In practice this means:

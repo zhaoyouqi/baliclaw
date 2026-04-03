@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { bootstrap, type BootstrapOptions } from "./bootstrap.js";
 import type { ProcessSignalSource } from "./shutdown.js";
 import { getLogger } from "../shared/logger.js";

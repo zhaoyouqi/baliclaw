@@ -2,6 +2,43 @@
 
 BaliClaw is a local-first AI gateway for Telegram DM workflows.
 
+## Quick Start
+
+Install:
+
+```bash
+npm install -g @zhaoyouqi/baliclaw
+```
+
+Before starting BaliClaw, make sure your Claude settings are already configured on this machine. In practice this means:
+
+- `~/.claude/settings.json` is configured for your provider
+- the required auth token and base URL settings are present when your provider needs them
+- the Claude runtime used by the Agent SDK can authenticate successfully with those settings
+
+If those Claude settings are not valid, BaliClaw will not be able to process Telegram messages.
+
+Start the daemon:
+
+```bash
+baliclawd
+```
+
+Check status:
+
+```bash
+baliclaw status
+```
+
+Set your Telegram bot token:
+
+```bash
+baliclaw config set --path channels.telegram.botToken '<TOKEN>'
+baliclaw config set --path channels.telegram.enabled true
+```
+
+On first run, BaliClaw creates local state under `~/.baliclaw/`, including a default workspace at `~/.baliclaw/workspace` with `AGENTS.md`, `SOUL.md`, and `USER.md`.
+
 Phase 1 is focused on a small but working loop:
 
 - a local daemon process

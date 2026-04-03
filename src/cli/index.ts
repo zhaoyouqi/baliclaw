@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { Command } from "commander";
 import { runConfigGetCommand, runConfigSetCommand } from "./commands/config.js";
 import { runDaemonCommand } from "./commands/daemon.js";

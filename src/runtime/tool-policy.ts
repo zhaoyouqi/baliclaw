@@ -1,15 +1,17 @@
 import { defaultAvailableTools, type AppConfig } from "../config/schema.js";
 
 export interface ToolPolicy {
-  permissionMode: "bypassPermissions";
-  allowDangerouslySkipPermissions: true;
+  permissionMode: "bypassPermissions" | "dontAsk";
+  allowDangerouslySkipPermissions?: true;
   tools: string[];
 }
 
-export function getPhase1ToolPolicy(config?: Pick<AppConfig, "tools">): ToolPolicy {
+export function getPhase1ToolPolicy(
+  config?: Pick<AppConfig, "tools">,
+  options: { isRoot?: boolean } = {}
+): ToolPolicy {
   return {
-    permissionMode: "bypassPermissions",
-    allowDangerouslySkipPermissions: true,
+    ...getPermissionSettings(options.isRoot ?? isRunningAsRoot()),
     tools: [...(config?.tools.availableTools ?? defaultAvailableTools)]
   };
 }
@@ -20,7 +22,8 @@ export function getToolPolicy(
     mcp: { servers: Record<string, unknown> };
     runtime: Pick<AppConfig["runtime"], "loadFilesystemSettings">;
     agents: Record<string, unknown>;
-  }
+  },
+  options: { isRoot?: boolean } = {}
 ): ToolPolicy {
   const tools = [...config.tools.availableTools];
 
@@ -40,8 +43,24 @@ export function getToolPolicy(
   }
 
   return {
-    permissionMode: "bypassPermissions",
-    allowDangerouslySkipPermissions: true,
+    ...getPermissionSettings(options.isRoot ?? isRunningAsRoot()),
     tools
   };
+}
+
+function getPermissionSettings(isRoot: boolean): Pick<ToolPolicy, "permissionMode" | "allowDangerouslySkipPermissions"> {
+  if (isRoot) {
+    return {
+      permissionMode: "dontAsk"
+    };
+  }
+
+  return {
+    permissionMode: "bypassPermissions",
+    allowDangerouslySkipPermissions: true
+  };
+}
+
+function isRunningAsRoot(): boolean {
+  return typeof process.getuid === "function" && process.getuid() === 0;
 }

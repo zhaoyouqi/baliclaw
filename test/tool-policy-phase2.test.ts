@@ -15,7 +15,7 @@ describe("getToolPolicy", () => {
           loadFilesystemSettings: false
         },
         agents: {}
-      })
+      }, { isRoot: false })
     ).toEqual({
       permissionMode: "bypassPermissions",
       allowDangerouslySkipPermissions: true,
@@ -47,7 +47,7 @@ describe("getToolPolicy", () => {
         loadFilesystemSettings: false
       },
       agents: {}
-    });
+    }, { isRoot: false });
 
     expect(policy.tools).toEqual(["Read", "mcp__github__*", "mcp__docs__*"]);
   });
@@ -71,7 +71,7 @@ describe("getToolPolicy", () => {
         loadFilesystemSettings: false
       },
       agents: {}
-    });
+    }, { isRoot: false });
 
     expect(policy.tools).toEqual(["Read", "mcp__github__*"]);
   });
@@ -89,7 +89,7 @@ describe("getToolPolicy", () => {
           loadFilesystemSettings: true
         },
         agents: {}
-      }).tools
+      }, { isRoot: false }).tools
     ).toEqual(["Read", "Skill"]);
   });
 
@@ -111,7 +111,7 @@ describe("getToolPolicy", () => {
             prompt: "You review code."
           }
         }
-      }).tools
+      }, { isRoot: false }).tools
     ).toEqual(["Read", "Agent"]);
   });
 
@@ -133,7 +133,27 @@ describe("getToolPolicy", () => {
             prompt: "You review code."
           }
         }
-      }).tools
+      }, { isRoot: false }).tools
     ).toEqual(["Read", "Agent"]);
+  });
+
+  it("uses dontAsk without dangerous skip when running as root", () => {
+    expect(
+      getToolPolicy({
+        tools: {
+          availableTools: ["Bash", "Read", "Write", "Edit"]
+        },
+        mcp: {
+          servers: {}
+        },
+        runtime: {
+          loadFilesystemSettings: true
+        },
+        agents: {}
+      }, { isRoot: true })
+    ).toEqual({
+      permissionMode: "dontAsk",
+      tools: ["Bash", "Read", "Write", "Edit", "Skill"]
+    });
   });
 });

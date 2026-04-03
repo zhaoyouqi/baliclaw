@@ -176,8 +176,8 @@ interface SdkQueryOptions {
   maxTurns: number;
   sessionId?: string;
   resume?: string;
-  permissionMode: "bypassPermissions";
-  allowDangerouslySkipPermissions: true;
+  permissionMode: "bypassPermissions" | "dontAsk";
+  allowDangerouslySkipPermissions?: true;
   tools: string[];
   mcpServers?: Record<string, SdkMcpServerConfig>;
   settingSources?: ["user", "project"];
@@ -203,7 +203,6 @@ function createSdkQueryOptions(params: {
     env: buildClaudeProcessEnv(),
     maxTurns: params.request.maxTurns ?? 8,
     permissionMode: params.toolPolicy.permissionMode,
-    allowDangerouslySkipPermissions: params.toolPolicy.allowDangerouslySkipPermissions,
     tools: params.toolPolicy.tools,
     stderr: createStderrCollector(),
     systemPrompt: {
@@ -212,6 +211,10 @@ function createSdkQueryOptions(params: {
       append: params.systemPrompt
     }
   };
+
+  if (params.toolPolicy.allowDangerouslySkipPermissions) {
+    options.allowDangerouslySkipPermissions = true;
+  }
 
   if (params.resumeSessionId) {
     options.resume = params.resumeSessionId;

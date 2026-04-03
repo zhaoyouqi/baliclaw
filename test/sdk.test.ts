@@ -269,6 +269,63 @@ describe("queryAgent", () => {
     expect(query.mock.calls[0]?.[0].options).not.toHaveProperty("sessionId");
   });
 
+  it("uses dontAsk without dangerous skip when running as root", async () => {
+    const originalGetuid = process.getuid;
+    const query = vi.fn(async function* () {
+      yield {
+        type: "result" as const,
+        subtype: "success" as const,
+        duration_ms: 1,
+        duration_api_ms: 1,
+        is_error: false,
+        num_turns: 1,
+        result: "ok",
+        stop_reason: null,
+        total_cost_usd: 0,
+        usage: {} as never,
+        modelUsage: {},
+        permission_denials: [],
+        uuid: "uuid",
+        session_id: "session"
+      };
+    });
+
+    try {
+      Object.defineProperty(process, "getuid", {
+        configurable: true,
+        value: () => 0
+      });
+
+      await queryAgent(
+        {
+          prompt: "hello",
+          sessionId: "telegram:default:direct:42",
+          cwd: "/tmp/project"
+        },
+        {
+          buildSystemPrompt: vi.fn().mockResolvedValue("prompt"),
+          buildAgentDefinitions: vi.fn().mockResolvedValue(undefined),
+          loadPromptOnlySkills: vi.fn().mockResolvedValue([]),
+          query: query as never
+        }
+      );
+    } finally {
+      Object.defineProperty(process, "getuid", {
+        configurable: true,
+        value: originalGetuid
+      });
+    }
+
+    expect(query).toHaveBeenCalledWith({
+      prompt: "hello",
+      options: expect.objectContaining({
+        permissionMode: "dontAsk",
+        tools: ["Bash", "Read", "Write", "Edit"]
+      })
+    });
+    expect(query.mock.calls[0]?.[0].options).not.toHaveProperty("allowDangerouslySkipPermissions");
+  });
+
   it("throws when the final SDK result is an error", async () => {
     const query = vi.fn(async function* () {
       yield {

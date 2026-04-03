@@ -209,7 +209,7 @@ describe("queryAgent", () => {
           all_proxy: expect.anything(),
           ALL_PROXY: expect.anything()
         }),
-        maxTurns: 8,
+        maxTurns: 16,
         sessionId: "17bb8bb2-b071-55fd-a53f-95e420de631f",
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
@@ -334,7 +334,7 @@ describe("queryAgent", () => {
         duration_ms: 1,
         duration_api_ms: 1,
         is_error: true,
-        num_turns: 8,
+        num_turns: 16,
         stop_reason: null,
         total_cost_usd: 0.5,
         usage: {} as never,

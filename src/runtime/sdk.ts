@@ -201,7 +201,7 @@ function createSdkQueryOptions(params: {
   const options: SdkQueryOptions = {
     cwd: params.request.cwd,
     env: buildClaudeProcessEnv(),
-    maxTurns: params.request.maxTurns ?? 8,
+    maxTurns: params.request.maxTurns ?? 16,
     permissionMode: params.toolPolicy.permissionMode,
     tools: params.toolPolicy.tools,
     stderr: createStderrCollector(),

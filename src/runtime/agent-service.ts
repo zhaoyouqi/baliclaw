@@ -31,7 +31,9 @@ export interface AgentServiceDependencies {
 }
 
 const genericAgentFailureMessage = "Sorry, I ran into an internal error while processing your request.";
-const maxTurnsFailureMessage = "Sorry, I couldn't finish that within the allowed turn limit.";
+const maxTurnsFailureMessage =
+  "Sorry, I hit the turn limit before I could finish. The task may be partially complete. Please try again, or increase runtime.maxTurns for longer multi-step tasks.";
+const permissionDeniedPrefix = "Sorry, Claude Code denied the requested operation: ";
 
 export class AgentService {
   private readonly logger: Logger;
@@ -139,11 +141,36 @@ function normalizeAgentRunOptions(
 }
 
 function toUserFacingFailureMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  const message = rawMessage.toLowerCase();
 
-  if (message.includes("max turns")) {
+  if (message.includes("max turns") || message.includes("error_max_turns")) {
     return maxTurnsFailureMessage;
   }
 
+  const permissionDeniedReason = extractPermissionDeniedReason(rawMessage);
+  if (permissionDeniedReason) {
+    return `${permissionDeniedPrefix}${permissionDeniedReason}`;
+  }
+
   return genericAgentFailureMessage;
+}
+
+function extractPermissionDeniedReason(message: string): string | null {
+  const firstLine = message.split("\n")[0]?.trim();
+  if (!firstLine) {
+    return null;
+  }
+
+  const normalized = firstLine.toLowerCase();
+  if (!normalized.includes("permission to use")) {
+    return null;
+  }
+
+  const sdkPrefix = "Claude Agent SDK failed: ";
+  if (firstLine.startsWith(sdkPrefix)) {
+    return firstLine.slice(sdkPrefix.length).trim();
+  }
+
+  return firstLine;
 }

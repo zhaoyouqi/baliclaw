@@ -115,7 +115,47 @@ describe("AgentService", () => {
     });
 
     await expect(service.handleMessage(makeMessage("hello"), "/tmp/project")).resolves.toBe(
-      "Sorry, I couldn't finish that within the allowed turn limit."
+      "Sorry, I hit the turn limit before I could finish. The task may be partially complete. Please try again, or increase runtime.maxTurns for longer multi-step tasks."
+    );
+    expect(destination.write).toHaveBeenCalled();
+  });
+
+  it("recognizes error_max_turns responses even when the SDK uses the subtype string", async () => {
+    const destination = { write: vi.fn(() => true) };
+    const logger = createLogger({ subsystem: "agent", destination });
+    const service = new AgentService({
+      logger,
+      runQueryAgent: vi.fn().mockRejectedValue(new Error("Claude Agent SDK failed: error_max_turns")),
+      sessionMapStore: {
+        get: vi.fn().mockResolvedValue(undefined),
+        set: vi.fn()
+      }
+    });
+
+    await expect(service.handleMessage(makeMessage("hello"), "/tmp/project")).resolves.toBe(
+      "Sorry, I hit the turn limit before I could finish. The task may be partially complete. Please try again, or increase runtime.maxTurns for longer multi-step tasks."
+    );
+    expect(destination.write).toHaveBeenCalled();
+  });
+
+  it("surfaces Claude Code permission denials in dontAsk mode to the user", async () => {
+    const destination = { write: vi.fn(() => true) };
+    const logger = createLogger({ subsystem: "agent", destination });
+    const service = new AgentService({
+      logger,
+      runQueryAgent: vi.fn().mockRejectedValue(
+        new Error(
+          "Claude Agent SDK failed: Permission to use Bash has been denied because Claude Code is running in don't ask mode.\nClaude stderr: ignored"
+        )
+      ),
+      sessionMapStore: {
+        get: vi.fn().mockResolvedValue(undefined),
+        set: vi.fn()
+      }
+    });
+
+    await expect(service.handleMessage(makeMessage("hello"), "/tmp/project")).resolves.toBe(
+      "Sorry, Claude Code denied the requested operation: Permission to use Bash has been denied because Claude Code is running in don't ask mode."
     );
     expect(destination.write).toHaveBeenCalled();
   });

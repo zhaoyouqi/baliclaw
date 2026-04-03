@@ -18,6 +18,18 @@ Before starting BaliClaw, make sure your Claude settings are already configured 
 
 If those Claude settings are not valid, BaliClaw will not be able to process Telegram messages.
 
+If you run BaliClaw as `root`, Claude Code cannot use `bypassPermissions`. In that setup BaliClaw falls back to `dontAsk`, and shell access such as `Bash` also needs to be statically allowed in `~/.claude/settings.json`, for example:
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(*)"]
+  }
+}
+```
+
+Without that extra allow rule, Claude may reject Bash tool calls even when `tools.availableTools` includes `Bash`.
+
 Start the daemon:
 
 ```bash
@@ -177,7 +189,7 @@ Phase 1 config shape:
   runtime: {
     workingDirectory: "/absolute/path/to/workdir",
     model: "claude-sonnet-4-5",
-    maxTurns: 8,
+    maxTurns: 16,
     systemPromptFile: "/absolute/path/to/system-prompt.md"
   },
   tools: {

@@ -27,7 +27,8 @@ const config: AppConfig = {
   },
   mcp: {
     servers: {}
-  }
+  },
+  agents: {}
 };
 
 describe("CLI config commands", () => {
@@ -72,7 +73,8 @@ describe("CLI config commands", () => {
       },
       mcp: {
         servers: {}
-      }
+      },
+      agents: {}
     });
     expect(output).toContain("\"workingDirectory\": \"/tmp/updated\"");
   });
@@ -115,7 +117,8 @@ describe("CLI config commands", () => {
         },
         mcp: {
           servers: {}
-        }
+        },
+        agents: {}
       });
     } finally {
       await rm(home, { recursive: true, force: true });

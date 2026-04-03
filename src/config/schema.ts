@@ -29,6 +29,21 @@ export type McpServerStdioConfig = z.infer<typeof mcpServerStdioSchema>;
 export type McpServerHttpConfig = z.infer<typeof mcpServerHttpSchema>;
 export type McpServerConfig = z.infer<typeof mcpServerSchema>;
 
+const agentDefinitionSchema = z.object({
+  description: z.string(),
+  prompt: z.string().optional(),
+  promptFile: z.string().optional(),
+  tools: z.array(z.string()).optional(),
+  model: z.enum(["sonnet", "opus", "haiku", "inherit"]).optional(),
+  skills: z.array(z.string()).optional(),
+  mcpServers: z.array(z.string()).optional()
+}).strict().refine(
+  (agent) => agent.prompt !== undefined || agent.promptFile !== undefined,
+  { message: "Either prompt or promptFile must be specified" }
+);
+
+export type AgentDefinitionConfig = z.infer<typeof agentDefinitionSchema>;
+
 const telegramConfigSchema = z.object({
   enabled: z.boolean().default(false),
   botToken: z.string().default("")
@@ -64,7 +79,8 @@ export const appConfigSchema = z.object({
   tools: withObjectDefaults(toolsConfigSchema),
   skills: withObjectDefaults(skillsConfigSchema),
   logging: withObjectDefaults(loggingConfigSchema),
-  mcp: withObjectDefaults(mcpConfigSchema)
+  mcp: withObjectDefaults(mcpConfigSchema),
+  agents: z.record(z.string(), agentDefinitionSchema).default({})
 }).strict().superRefine((config, context) => {
   if (config.channels.telegram.enabled && config.channels.telegram.botToken.trim().length === 0) {
     context.addIssue({

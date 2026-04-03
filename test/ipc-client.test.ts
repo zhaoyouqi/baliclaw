@@ -76,7 +76,8 @@ describe("IpcClient", () => {
       },
       mcp: {
         servers: {}
-      }
+      },
+      agents: {}
     };
     const client = new IpcClient({
       requestJson: async (path, init) => {

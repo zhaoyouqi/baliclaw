@@ -51,3 +51,21 @@ What to add:
 Desired outcome:
 
 - Users can expand BaliClaw behavior immediately instead of first building the tooling needed to build skills.
+
+## 4. Add A TUI For Local Debugging And Temporary Use
+
+Current gap:
+
+- BaliClaw currently depends on configured channels such as Telegram for normal interaction.
+- This makes local debugging slower and leaves no lightweight fallback when channels are not configured on a remote node yet.
+
+What to add:
+
+- Build a terminal UI for local interactive use.
+- Let operators send prompts and inspect replies without going through Telegram.
+- Make it usable as a temporary interaction surface on remote machines before channel configuration is complete.
+
+Desired outcome:
+
+- Developers can debug BaliClaw locally with a fast feedback loop.
+- Remote nodes can still be used interactively even before Telegram or other channels are configured.

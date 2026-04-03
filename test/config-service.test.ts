@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -18,7 +18,7 @@ describe("ConfigService", () => {
         enabled: false,
         botToken: ""
       });
-      expect(config.runtime.workingDirectory).toBe(process.cwd());
+      expect(config.runtime.workingDirectory).toBe(join(home, ".baliclaw", "workspace"));
       expect(config.tools.availableTools).toEqual(["Bash", "Read", "Write", "Edit"]);
       expect(config.skills).toEqual({
         enabled: true,
@@ -28,6 +28,9 @@ describe("ConfigService", () => {
       expect(config.logging).toEqual({
         level: "info"
       });
+      await expect(readFile(join(home, ".baliclaw", "workspace", "AGENTS.md"), "utf8")).resolves.toContain("BaliClaw Workspace Rules");
+      await expect(readFile(join(home, ".baliclaw", "workspace", "SOUL.md"), "utf8")).resolves.toContain("BaliClaw Default Identity");
+      await expect(readFile(join(home, ".baliclaw", "workspace", "USER.md"), "utf8")).resolves.toContain("About The User");
     } finally {
       await rm(home, { recursive: true, force: true });
     }
@@ -64,7 +67,7 @@ describe("ConfigService", () => {
       });
       expect(config.runtime.model).toBe("claude-sonnet");
       expect(config.runtime.maxTurns).toBe(12);
-      expect(config.runtime.workingDirectory).toBe(process.cwd());
+      expect(config.runtime.workingDirectory).toBe(join(home, ".baliclaw", "workspace"));
     } finally {
       await rm(home, { recursive: true, force: true });
     }

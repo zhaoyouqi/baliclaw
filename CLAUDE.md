@@ -87,3 +87,9 @@ Vitest. Tests in `test/`, named after the unit (e.g., `stable-key.test.ts`). Cri
 
 - `docs/phase2/phase2-design-spec.md` — Skills, MCP, SubAgents, personalization design
 - `docs/phase2/phase2-task-list.md` — Phase 2 milestones and executable tasks
+
+### Reference Templates
+
+- `docs/reference/AGENTS.default.md` — Default workspace operating rules for BaliClaw installs
+- `docs/reference/SOUL.default.md` — Default identity and tone template
+- `docs/reference/USER.default.md` — Default user-context template

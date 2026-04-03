@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 export interface AppPaths {
   rootDir: string;
+  workspaceDir: string;
   configFile: string;
   socketFile: string;
   pairingDir: string;
@@ -20,6 +21,7 @@ export interface AppPaths {
 
 export function getAppPaths(home = homedir()): AppPaths {
   const rootDir = join(home, ".baliclaw");
+  const workspaceDir = join(rootDir, "workspace");
   const pairingDir = join(rootDir, "pairing");
   const sessionDir = join(rootDir, "sessions");
   const memoryDir = join(rootDir, "memory");
@@ -29,6 +31,7 @@ export function getAppPaths(home = homedir()): AppPaths {
 
   return {
     rootDir,
+    workspaceDir,
     configFile: join(rootDir, "baliclaw.json5"),
     socketFile: join(rootDir, "baliclaw.sock"),
     pairingDir,
@@ -47,6 +50,7 @@ export function getAppPaths(home = homedir()): AppPaths {
 export async function ensureStateDirectories(paths: AppPaths = getAppPaths()): Promise<void> {
   await Promise.all([
     mkdir(paths.rootDir, { recursive: true }),
+    mkdir(paths.workspaceDir, { recursive: true }),
     mkdir(paths.pairingDir, { recursive: true }),
     mkdir(paths.sessionDir, { recursive: true }),
     mkdir(paths.memoryGlobalDir, { recursive: true }),

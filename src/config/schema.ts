@@ -1,4 +1,7 @@
 import { z } from "zod";
+import type { AppPaths } from "./paths.js";
+import { getAppPaths } from "./paths.js";
+import { getDefaultWorkspaceDirectory } from "./workspace.js";
 
 export const defaultAvailableTools = ["Bash", "Read", "Write", "Edit"] as const;
 
@@ -103,6 +106,10 @@ export const appConfigSchema = z.object({
 
 export type AppConfig = z.infer<typeof appConfigSchema>;
 
-export function getDefaultConfig(): AppConfig {
-  return appConfigSchema.parse({});
+export function getDefaultConfig(paths: AppPaths = getAppPaths()): AppConfig {
+  return appConfigSchema.parse({
+    runtime: {
+      workingDirectory: getDefaultWorkspaceDirectory(paths)
+    }
+  });
 }

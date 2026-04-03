@@ -8,6 +8,7 @@ describe("getAppPaths", () => {
   it("derives the managed state files under ~/.baliclaw", () => {
     const paths = getAppPaths("/tmp/example-home");
     expect(paths.rootDir).toBe("/tmp/example-home/.baliclaw");
+    expect(paths.workspaceDir).toBe("/tmp/example-home/.baliclaw/workspace");
     expect(paths.configFile).toBe("/tmp/example-home/.baliclaw/baliclaw.json5");
     expect(paths.socketFile).toBe("/tmp/example-home/.baliclaw/baliclaw.sock");
     expect(paths.pendingPairingFile).toBe("/tmp/example-home/.baliclaw/pairing/telegram-pending.json");
@@ -27,12 +28,14 @@ describe("ensureStateDirectories", () => {
       await ensureStateDirectories(paths);
 
       const stateDir = await stat(paths.rootDir);
+      const workspaceDir = await stat(paths.workspaceDir);
       const pairingDir = await stat(paths.pairingDir);
       const memoryGlobalDir = await stat(paths.memoryGlobalDir);
       const memoryProjectsDir = await stat(paths.memoryProjectsDir);
       const logsDir = await stat(paths.logsDir);
 
       expect(stateDir.isDirectory()).toBe(true);
+      expect(workspaceDir.isDirectory()).toBe(true);
       expect(pairingDir.isDirectory()).toBe(true);
       expect(memoryGlobalDir.isDirectory()).toBe(true);
       expect(memoryProjectsDir.isDirectory()).toBe(true);

@@ -264,4 +264,55 @@ describe("CLI config commands", () => {
       })
     );
   });
+
+  it("updates memory.enabled through --path", async () => {
+    const client = {
+      getConfig: vi.fn<() => Promise<AppConfig>>().mockResolvedValue(config),
+      setConfig: vi.fn<(value: AppConfig) => Promise<AppConfig>>().mockImplementation(async (value) => value)
+    } as never;
+
+    await runConfigSetCommand("false", { path: "memory.enabled" }, client);
+
+    expect(client.setConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        memory: {
+          enabled: false,
+          globalEnabled: false,
+          maxLines: 200
+        }
+      })
+    );
+  });
+
+  it("updates skills.sdkNative through --path", async () => {
+    const client = {
+      getConfig: vi.fn<() => Promise<AppConfig>>().mockResolvedValue(config),
+      setConfig: vi.fn<(value: AppConfig) => Promise<AppConfig>>().mockImplementation(async (value) => value)
+    } as never;
+
+    await runConfigSetCommand("false", { path: "skills.sdkNative" }, client);
+
+    expect(client.setConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skills: {
+          enabled: true,
+          directories: [],
+          sdkNative: false
+        }
+      })
+    );
+  });
+
+  it("rejects invalid Phase 2 values through --path", async () => {
+    const client = {
+      getConfig: vi.fn<() => Promise<AppConfig>>().mockResolvedValue(config),
+      setConfig: vi.fn()
+    } as never;
+
+    await expect(
+      runConfigSetCommand("\"nope\"", { path: "memory.enabled" }, client)
+    ).rejects.toThrow();
+
+    expect(client.setConfig).not.toHaveBeenCalled();
+  });
 });

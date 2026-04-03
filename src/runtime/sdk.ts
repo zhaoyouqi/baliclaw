@@ -15,6 +15,7 @@ export interface QueryRequest {
   skillDirectories?: string[];
   tools?: string[];
   mcpServers?: Record<string, SdkMcpServerConfig>;
+  sdkNativeSkills?: boolean;
 }
 
 export interface QueryUsage {
@@ -125,6 +126,7 @@ interface SdkQueryOptions {
   allowDangerouslySkipPermissions: true;
   tools: string[];
   mcpServers?: Record<string, SdkMcpServerConfig>;
+  settingSources?: ["user", "project"];
   stderr: (data: string) => void;
   systemPrompt: {
     type: "preset";
@@ -167,6 +169,10 @@ function createSdkQueryOptions(params: {
 
   if (params.request.mcpServers && Object.keys(params.request.mcpServers).length > 0) {
     options.mcpServers = params.request.mcpServers;
+  }
+
+  if (params.request.sdkNativeSkills) {
+    options.settingSources = ["user", "project"];
   }
 
   return options;

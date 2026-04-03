@@ -63,7 +63,8 @@ describe("AgentService", () => {
       maxTurns: 12,
       systemPromptFile: "/tmp/system.md",
       skillDirectories: ["/tmp/skills"],
-      tools: ["Read", "Bash"]
+      tools: ["Read", "Bash"],
+      sdkNativeSkills: true
     });
 
     expect(queryAgent).toHaveBeenCalledWith({
@@ -75,7 +76,8 @@ describe("AgentService", () => {
       maxTurns: 12,
       systemPromptFile: "/tmp/system.md",
       skillDirectories: ["/tmp/skills"],
-      tools: ["Read", "Bash"]
+      tools: ["Read", "Bash"],
+      sdkNativeSkills: true
     });
     expect(sessionMapStore.set).toHaveBeenCalledWith("custom-session", "claude-session-2");
   });

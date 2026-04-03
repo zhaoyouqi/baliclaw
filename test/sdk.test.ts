@@ -13,6 +13,7 @@ describe("queryAgent", () => {
         permissionMode?: string;
         allowDangerouslySkipPermissions?: boolean;
         tools?: string[];
+        settingSources?: string[];
         systemPrompt?: {
           type: "preset";
           preset: "claude_code";
@@ -46,7 +47,8 @@ describe("queryAgent", () => {
         maxTurns: 12,
         systemPromptFile: "/tmp/system.md",
         skillDirectories: ["/tmp/extra-skills"],
-        tools: ["Read", "Bash"]
+        tools: ["Read", "Bash"],
+        sdkNativeSkills: true
       },
       {
         buildSystemPrompt: vi.fn().mockResolvedValue("assembled prompt"),
@@ -86,6 +88,7 @@ describe("queryAgent", () => {
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
         tools: ["Read", "Bash"],
+        settingSources: ["user", "project"],
         stderr: expect.any(Function),
         systemPrompt: {
           type: "preset",
@@ -154,6 +157,7 @@ describe("queryAgent", () => {
         }
       })
     });
+    expect(query.mock.calls[0]?.[0].options).not.toHaveProperty("settingSources");
   });
 
   it("uses resume instead of opening a new Claude session when a previous Claude session id exists", async () => {

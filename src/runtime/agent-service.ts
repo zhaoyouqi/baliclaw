@@ -15,6 +15,7 @@ export interface AgentRunOptions {
   skillDirectories?: string[];
   tools?: string[];
   mcpServers?: Record<string, SdkMcpServerConfig>;
+  sdkNativeSkills?: boolean;
 }
 
 export interface AgentServiceDependencies {
@@ -73,6 +74,9 @@ export class AgentService {
       }
       if (options.mcpServers) {
         request.mcpServers = options.mcpServers;
+      }
+      if (options.sdkNativeSkills !== undefined) {
+        request.sdkNativeSkills = options.sdkNativeSkills;
       }
 
       const result = await this.runQueryAgent(request);

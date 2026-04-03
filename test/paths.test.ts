@@ -12,12 +12,15 @@ describe("getAppPaths", () => {
     expect(paths.socketFile).toBe("/tmp/example-home/.baliclaw/baliclaw.sock");
     expect(paths.pendingPairingFile).toBe("/tmp/example-home/.baliclaw/pairing/telegram-pending.json");
     expect(paths.allowlistFile).toBe("/tmp/example-home/.baliclaw/pairing/telegram-allowlist.json");
+    expect(paths.memoryDir).toBe("/tmp/example-home/.baliclaw/memory");
+    expect(paths.memoryGlobalDir).toBe("/tmp/example-home/.baliclaw/memory/global");
+    expect(paths.memoryProjectsDir).toBe("/tmp/example-home/.baliclaw/memory/projects");
     expect(paths.logFile).toBe("/tmp/example-home/.baliclaw/logs/daemon.log");
   });
 });
 
 describe("ensureStateDirectories", () => {
-  it("creates root, pairing, and logs directories", async () => {
+  it("creates root, pairing, memory, and logs directories", async () => {
     const home = await mkdtemp(join(tmpdir(), "baliclaw-home-"));
     try {
       const paths = getAppPaths(home);
@@ -25,10 +28,14 @@ describe("ensureStateDirectories", () => {
 
       const stateDir = await stat(paths.rootDir);
       const pairingDir = await stat(paths.pairingDir);
+      const memoryGlobalDir = await stat(paths.memoryGlobalDir);
+      const memoryProjectsDir = await stat(paths.memoryProjectsDir);
       const logsDir = await stat(paths.logsDir);
 
       expect(stateDir.isDirectory()).toBe(true);
       expect(pairingDir.isDirectory()).toBe(true);
+      expect(memoryGlobalDir.isDirectory()).toBe(true);
+      expect(memoryProjectsDir.isDirectory()).toBe(true);
       expect(logsDir.isDirectory()).toBe(true);
     } finally {
       await rm(home, { recursive: true, force: true });

@@ -2,6 +2,7 @@
 
 import { bootstrap, type BootstrapOptions } from "./bootstrap.js";
 import type { ProcessSignalSource } from "./shutdown.js";
+import { isExecutedAsScript } from "../shared/entrypoint.js";
 import { getLogger } from "../shared/logger.js";
 
 const fallbackLogger = getLogger("daemon");
@@ -36,7 +37,7 @@ export async function runDaemon(options: RunDaemonOptions = {}): Promise<void> {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isExecutedAsScript(import.meta.url, process.argv[1])) {
   void runDaemon().catch((error) => {
     fallbackLogger.error({ err: error }, "daemon exited with error");
     process.exitCode = 1;

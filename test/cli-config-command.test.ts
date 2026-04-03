@@ -28,7 +28,12 @@ const config: AppConfig = {
   mcp: {
     servers: {}
   },
-  agents: {}
+  agents: {},
+  memory: {
+    enabled: true,
+    globalEnabled: false,
+    maxLines: 200
+  }
 };
 
 describe("CLI config commands", () => {
@@ -74,7 +79,12 @@ describe("CLI config commands", () => {
       mcp: {
         servers: {}
       },
-      agents: {}
+      agents: {},
+      memory: {
+        enabled: true,
+        globalEnabled: false,
+        maxLines: 200
+      }
     });
     expect(output).toContain("\"workingDirectory\": \"/tmp/updated\"");
   });
@@ -118,7 +128,12 @@ describe("CLI config commands", () => {
         mcp: {
           servers: {}
         },
-        agents: {}
+        agents: {},
+        memory: {
+          enabled: true,
+          globalEnabled: false,
+          maxLines: 200
+        }
       });
     } finally {
       await rm(home, { recursive: true, force: true });

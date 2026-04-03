@@ -77,7 +77,12 @@ describe("IpcClient", () => {
       mcp: {
         servers: {}
       },
-      agents: {}
+      agents: {},
+      memory: {
+        enabled: true,
+        globalEnabled: false,
+        maxLines: 200
+      }
     };
     const client = new IpcClient({
       requestJson: async (path, init) => {

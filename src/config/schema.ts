@@ -73,6 +73,12 @@ const loggingConfigSchema = z.object({
   level: z.enum(["debug", "info", "warn", "error"]).default("info")
 }).strict();
 
+const memoryConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  globalEnabled: z.boolean().default(false),
+  maxLines: z.number().int().positive().default(200)
+}).strict();
+
 export const appConfigSchema = z.object({
   channels: withObjectDefaults(channelsConfigSchema),
   runtime: withObjectDefaults(runtimeConfigSchema),
@@ -80,7 +86,8 @@ export const appConfigSchema = z.object({
   skills: withObjectDefaults(skillsConfigSchema),
   logging: withObjectDefaults(loggingConfigSchema),
   mcp: withObjectDefaults(mcpConfigSchema),
-  agents: z.record(z.string(), agentDefinitionSchema).default({})
+  agents: z.record(z.string(), agentDefinitionSchema).default({}),
+  memory: withObjectDefaults(memoryConfigSchema)
 }).strict().superRefine((config, context) => {
   if (config.channels.telegram.enabled && config.channels.telegram.botToken.trim().length === 0) {
     context.addIssue({

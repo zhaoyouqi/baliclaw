@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { queryAgent } from "../src/runtime/sdk.js";
+import { getAppPaths } from "../src/config/paths.js";
+import { getProjectMemoryFilePath } from "../src/runtime/memory.js";
 
 describe("queryAgent", () => {
   it("passes cwd, sessionId, tool policy, and system prompt into the SDK query call", async () => {
+    const paths = getAppPaths("/tmp/baliclaw-sdk-test-home");
+    const buildSystemPrompt = vi.fn().mockResolvedValue("assembled prompt");
+    const readMemory = vi.fn().mockResolvedValue("remembered facts");
     const query = vi.fn(async function* (params: {
       prompt: string;
       options?: {
@@ -14,6 +19,7 @@ describe("queryAgent", () => {
         allowDangerouslySkipPermissions?: boolean;
         tools?: string[];
         settingSources?: string[];
+        mcpServers?: Record<string, unknown>;
         agents?: Record<string, { description: string; prompt: string }>;
         systemPrompt?: {
           type: "preset";
@@ -47,24 +53,36 @@ describe("queryAgent", () => {
         cwd: "/tmp/project",
         maxTurns: 12,
         systemPromptFile: "/tmp/system.md",
+        soulFile: "/tmp/soul.md",
+        userFile: "/tmp/user.md",
         skillDirectories: ["/tmp/extra-skills"],
         tools: ["Read", "Bash"],
+        mcpServers: {
+          github: {
+            command: "npx",
+            args: ["-y", "@modelcontextprotocol/server-github"]
+          }
+        },
         sdkNativeSkills: true,
         agents: {
           reviewer: {
             description: "Review code",
             prompt: "You review code."
           }
-        }
+        },
+        memoryEnabled: true,
+        memoryMaxLines: 99
       },
       {
-        buildSystemPrompt: vi.fn().mockResolvedValue("assembled prompt"),
+        paths,
+        buildSystemPrompt,
         buildAgentDefinitions: vi.fn().mockResolvedValue({
           reviewer: {
             description: "Review code",
             prompt: "You review code."
           }
         }),
+        readMemory,
         loadPromptOnlySkills: vi.fn().mockResolvedValue([
           {
             name: "alpha",
@@ -100,8 +118,14 @@ describe("queryAgent", () => {
         sessionId: "17bb8bb2-b071-55fd-a53f-95e420de631f",
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
-        tools: ["Read", "Bash"],
+        tools: ["Read", "Bash", "mcp__github__*", "Skill", "Agent"],
         settingSources: ["user", "project"],
+        mcpServers: {
+          github: {
+            command: "npx",
+            args: ["-y", "@modelcontextprotocol/server-github"]
+          }
+        },
         agents: {
           reviewer: {
             description: "Review code",
@@ -115,6 +139,27 @@ describe("queryAgent", () => {
           append: "assembled prompt"
         }
       })
+    });
+    expect(readMemory).toHaveBeenCalledWith({
+      paths,
+      workingDirectory: "/tmp/project",
+      maxLines: 99
+    });
+    expect(buildSystemPrompt).toHaveBeenCalledWith({
+      workingDirectory: "/tmp/project",
+      soulFile: "/tmp/soul.md",
+      userFile: "/tmp/user.md",
+      systemPromptFile: "/tmp/system.md",
+      memoryEnabled: true,
+      memoryFilePath: getProjectMemoryFilePath(paths, "/tmp/project"),
+      memoryContent: "remembered facts",
+      skillPrompts: [
+        {
+          name: "alpha",
+          content: "alpha skill",
+          path: "/tmp/project/skills/alpha/SKILL.md"
+        }
+      ]
     });
   });
 

@@ -8,10 +8,11 @@ import {
   type McpServerConfig as SdkMcpServerConfig
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinitionConfig } from "../config/schema.js";
+import { getAppPaths, type AppPaths } from "../config/paths.js";
 import { buildAgentDefinitions } from "./agents.js";
+import { getProjectMemoryFilePath, readMemory } from "./memory.js";
 import { buildSystemPrompt } from "./prompts.js";
 import { loadPromptOnlySkills } from "./skills.js";
-import { getPhase1ToolPolicy } from "./tool-policy.js";
 
 export interface QueryRequest {
   prompt: string;
@@ -21,11 +22,15 @@ export interface QueryRequest {
   model?: string;
   maxTurns?: number;
   systemPromptFile?: string;
+  soulFile?: string;
+  userFile?: string;
   skillDirectories?: string[];
   tools?: string[];
   mcpServers?: Record<string, SdkMcpServerConfig>;
   sdkNativeSkills?: boolean;
   agents?: Record<string, AgentDefinitionConfig>;
+  memoryEnabled?: boolean;
+  memoryMaxLines?: number;
 }
 
 export interface QueryUsage {
@@ -40,8 +45,10 @@ export interface QueryResult {
 }
 
 export interface QueryAgentDependencies {
+  paths?: AppPaths;
   buildSystemPrompt?: typeof buildSystemPrompt;
   buildAgentDefinitions?: typeof buildAgentDefinitions;
+  readMemory?: typeof readMemory;
   loadPromptOnlySkills?: typeof loadPromptOnlySkills;
   query?: typeof sdkQuery;
 }
@@ -52,6 +59,8 @@ export async function queryAgent(
 ): Promise<QueryResult> {
   const buildPrompt = dependencies.buildSystemPrompt ?? buildSystemPrompt;
   const buildAgents = dependencies.buildAgentDefinitions ?? buildAgentDefinitions;
+  const paths = dependencies.paths ?? getAppPaths();
+  const readMemoryFile = dependencies.readMemory ?? readMemory;
   const loadSkills = dependencies.loadPromptOnlySkills ?? loadPromptOnlySkills;
   const runQuery = dependencies.query ?? sdkQuery;
 
@@ -66,14 +75,34 @@ export async function queryAgent(
 
   const promptOptions: {
     workingDirectory: string;
+    soulFile?: string;
+    userFile?: string;
     systemPromptFile?: string;
+    memoryEnabled?: boolean;
+    memoryContent?: string;
+    memoryFilePath?: string;
     skillPrompts: typeof skillPrompts;
   } = {
     workingDirectory: request.cwd,
     skillPrompts
   };
+  if (request.soulFile) {
+    promptOptions.soulFile = request.soulFile;
+  }
+  if (request.userFile) {
+    promptOptions.userFile = request.userFile;
+  }
   if (request.systemPromptFile) {
     promptOptions.systemPromptFile = request.systemPromptFile;
+  }
+  if (request.memoryEnabled) {
+    promptOptions.memoryEnabled = true;
+    promptOptions.memoryFilePath = getProjectMemoryFilePath(paths, request.cwd);
+    promptOptions.memoryContent = await readMemoryFile({
+      paths,
+      workingDirectory: request.cwd,
+      maxLines: request.memoryMaxLines ?? 200
+    });
   }
 
   const systemPrompt = await buildPrompt(promptOptions);
@@ -84,15 +113,7 @@ export async function queryAgent(
         ...(request.mcpServers ? { mcpServers: request.mcpServers } : {})
       })
     : undefined;
-  const toolPolicy = getPhase1ToolPolicy(
-    request.tools
-      ? {
-          tools: {
-            availableTools: request.tools
-          }
-        }
-      : undefined
-  );
+  const toolPolicy = buildRequestToolPolicy(request);
   const deterministicClaudeSessionId = toClaudeSessionUuid(request.sessionId);
 
   try {
@@ -161,7 +182,7 @@ function createSdkQueryOptions(params: {
   request: QueryRequest;
   systemPrompt: string;
   agentDefinitions?: Record<string, SdkAgentDefinition>;
-  toolPolicy: ReturnType<typeof getPhase1ToolPolicy>;
+  toolPolicy: ReturnType<typeof buildRequestToolPolicy>;
   resumeSessionId?: string;
   deterministicClaudeSessionId: string;
 }): SdkQueryOptions {
@@ -202,6 +223,32 @@ function createSdkQueryOptions(params: {
   }
 
   return options;
+}
+
+function buildRequestToolPolicy(request: QueryRequest): {
+  permissionMode: "bypassPermissions";
+  allowDangerouslySkipPermissions: true;
+  tools: string[];
+} {
+  const tools = [...(request.tools ?? ["Bash", "Read", "Write", "Edit"])];
+
+  for (const serverName of Object.keys(request.mcpServers ?? {})) {
+    tools.push(`mcp__${serverName}__*`);
+  }
+
+  if (request.sdkNativeSkills && !tools.includes("Skill")) {
+    tools.push("Skill");
+  }
+
+  if (request.agents && Object.keys(request.agents).length > 0 && !tools.includes("Agent")) {
+    tools.push("Agent");
+  }
+
+  return {
+    permissionMode: "bypassPermissions",
+    allowDangerouslySkipPermissions: true,
+    tools
+  };
 }
 
 async function executeSdkQuery(

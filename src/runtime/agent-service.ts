@@ -72,6 +72,12 @@ export class AgentService {
       if (options.systemPromptFile) {
         request.systemPromptFile = options.systemPromptFile;
       }
+      if (options.soulFile) {
+        request.soulFile = options.soulFile;
+      }
+      if (options.userFile) {
+        request.userFile = options.userFile;
+      }
       if (options.skillDirectories) {
         request.skillDirectories = options.skillDirectories;
       }
@@ -86,6 +92,12 @@ export class AgentService {
       }
       if (options.agents) {
         request.agents = options.agents;
+      }
+      if (options.memoryEnabled !== undefined) {
+        request.memoryEnabled = options.memoryEnabled;
+      }
+      if (options.memoryMaxLines !== undefined) {
+        request.memoryMaxLines = options.memoryMaxLines;
       }
 
       const result = await this.runQueryAgent(request);

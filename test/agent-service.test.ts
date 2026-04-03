@@ -62,6 +62,8 @@ describe("AgentService", () => {
       model: "claude-sonnet",
       maxTurns: 12,
       systemPromptFile: "/tmp/system.md",
+      soulFile: "/tmp/soul.md",
+      userFile: "/tmp/user.md",
       skillDirectories: ["/tmp/skills"],
       tools: ["Read", "Bash"],
       sdkNativeSkills: true,
@@ -70,7 +72,9 @@ describe("AgentService", () => {
           description: "Review code",
           prompt: "You review code."
         }
-      }
+      },
+      memoryEnabled: true,
+      memoryMaxLines: 64
     });
 
     expect(queryAgent).toHaveBeenCalledWith({
@@ -81,6 +85,8 @@ describe("AgentService", () => {
       model: "claude-sonnet",
       maxTurns: 12,
       systemPromptFile: "/tmp/system.md",
+      soulFile: "/tmp/soul.md",
+      userFile: "/tmp/user.md",
       skillDirectories: ["/tmp/skills"],
       tools: ["Read", "Bash"],
       sdkNativeSkills: true,
@@ -89,7 +95,9 @@ describe("AgentService", () => {
           description: "Review code",
           prompt: "You review code."
         }
-      }
+      },
+      memoryEnabled: true,
+      memoryMaxLines: 64
     });
     expect(sessionMapStore.set).toHaveBeenCalledWith("custom-session", "claude-session-2");
   });

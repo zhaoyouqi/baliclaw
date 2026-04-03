@@ -11,10 +11,8 @@ describe("getToolPolicy", () => {
         mcp: {
           servers: {}
         },
-        skills: {
-          enabled: true,
-          directories: [],
-          sdkNative: false
+        runtime: {
+          loadFilesystemSettings: false
         },
         agents: {}
       })
@@ -45,10 +43,8 @@ describe("getToolPolicy", () => {
           }
         }
       },
-      skills: {
-        enabled: true,
-        directories: [],
-        sdkNative: false
+      runtime: {
+        loadFilesystemSettings: false
       },
       agents: {}
     });
@@ -71,10 +67,8 @@ describe("getToolPolicy", () => {
           }
         }
       },
-      skills: {
-        enabled: true,
-        directories: [],
-        sdkNative: false
+      runtime: {
+        loadFilesystemSettings: false
       },
       agents: {}
     });
@@ -82,7 +76,7 @@ describe("getToolPolicy", () => {
     expect(policy.tools).toEqual(["Read", "mcp__github__*"]);
   });
 
-  it("adds the Skill tool when sdkNative skills are enabled", () => {
+  it("adds the Skill tool when filesystem settings loading is enabled", () => {
     expect(
       getToolPolicy({
         tools: {
@@ -91,10 +85,8 @@ describe("getToolPolicy", () => {
         mcp: {
           servers: {}
         },
-        skills: {
-          enabled: true,
-          directories: [],
-          sdkNative: true
+        runtime: {
+          loadFilesystemSettings: true
         },
         agents: {}
       }).tools
@@ -110,10 +102,8 @@ describe("getToolPolicy", () => {
         mcp: {
           servers: {}
         },
-        skills: {
-          enabled: true,
-          directories: [],
-          sdkNative: false
+        runtime: {
+          loadFilesystemSettings: false
         },
         agents: {
           reviewer: {
@@ -134,10 +124,8 @@ describe("getToolPolicy", () => {
         mcp: {
           servers: {}
         },
-        skills: {
-          enabled: true,
-          directories: [],
-          sdkNative: false
+        runtime: {
+          loadFilesystemSettings: false
         },
         agents: {
           reviewer: {

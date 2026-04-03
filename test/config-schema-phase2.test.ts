@@ -88,7 +88,7 @@ describe("appConfigSchema Phase 2", () => {
     ).toThrow("Either prompt or promptFile must be specified");
   });
 
-  it("applies Phase 2 defaults for memory and sdkNative skills", () => {
+  it("applies Phase 2 defaults for memory and filesystem settings loading", () => {
     const config = appConfigSchema.parse({});
 
     expect(config.memory).toEqual({
@@ -96,7 +96,7 @@ describe("appConfigSchema Phase 2", () => {
       globalEnabled: false,
       maxLines: 200
     });
-    expect(config.skills.sdkNative).toBe(true);
+    expect(config.runtime.loadFilesystemSettings).toBe(true);
   });
 
   it("fills all new sections when parsing an empty config", () => {
@@ -111,9 +111,9 @@ describe("appConfigSchema Phase 2", () => {
     });
     expect(config.skills).toEqual({
       enabled: true,
-      directories: [],
-      sdkNative: true
+      directories: []
     });
+    expect(config.runtime.loadFilesystemSettings).toBe(true);
     expect(config.runtime.soulFile).toBeUndefined();
     expect(config.runtime.userFile).toBeUndefined();
   });
@@ -146,7 +146,7 @@ describe("appConfigSchema Phase 2", () => {
 
     expect(config.channels.telegram.enabled).toBe(true);
     expect(config.runtime.systemPromptFile).toBe("/tmp/system.md");
-    expect(config.skills.sdkNative).toBe(true);
+    expect(config.runtime.loadFilesystemSettings).toBe(true);
     expect(config.mcp.servers).toEqual({});
     expect(config.agents).toEqual({});
   });

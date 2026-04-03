@@ -13,15 +13,15 @@ const config: AppConfig = {
     }
   },
   runtime: {
-    workingDirectory: "/tmp/baliclaw"
+    workingDirectory: "/tmp/baliclaw",
+    loadFilesystemSettings: true
   },
   tools: {
     availableTools: ["Bash", "Read", "Write", "Edit"]
   },
   skills: {
     enabled: true,
-    directories: [],
-    sdkNative: true
+    directories: []
   },
   logging: {
     level: "info"
@@ -65,15 +65,15 @@ describe("CLI config commands", () => {
         }
       },
       runtime: {
-        workingDirectory: "/tmp/updated"
+        workingDirectory: "/tmp/updated",
+        loadFilesystemSettings: true
       },
       tools: {
         availableTools: ["Bash"]
       },
       skills: {
         enabled: true,
-        directories: [],
-        sdkNative: true
+        directories: []
       },
       logging: {
         level: "warn"
@@ -115,15 +115,15 @@ describe("CLI config commands", () => {
           }
         },
         runtime: {
-          workingDirectory: "/tmp/from-file"
+          workingDirectory: "/tmp/from-file",
+          loadFilesystemSettings: true
         },
         tools: {
           availableTools: ["Read"]
         },
         skills: {
           enabled: true,
-          directories: [],
-          sdkNative: true
+          directories: []
         },
         logging: {
           level: "debug"
@@ -284,20 +284,19 @@ describe("CLI config commands", () => {
     );
   });
 
-  it("updates skills.sdkNative through --path", async () => {
+  it("updates runtime.loadFilesystemSettings through --path", async () => {
     const client = {
       getConfig: vi.fn<() => Promise<AppConfig>>().mockResolvedValue(config),
       setConfig: vi.fn<(value: AppConfig) => Promise<AppConfig>>().mockImplementation(async (value) => value)
     } as never;
 
-    await runConfigSetCommand("false", { path: "skills.sdkNative" }, client);
+    await runConfigSetCommand("false", { path: "runtime.loadFilesystemSettings" }, client);
 
     expect(client.setConfig).toHaveBeenCalledWith(
       expect.objectContaining({
-        skills: {
-          enabled: true,
-          directories: [],
-          sdkNative: false
+        runtime: {
+          workingDirectory: "/tmp/baliclaw",
+          loadFilesystemSettings: false
         }
       })
     );

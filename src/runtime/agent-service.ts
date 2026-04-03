@@ -18,7 +18,7 @@ export interface AgentRunOptions {
   skillDirectories?: string[];
   tools?: string[];
   mcpServers?: Record<string, SdkMcpServerConfig>;
-  sdkNativeSkills?: boolean;
+  loadFilesystemSettings?: boolean;
   agents?: Record<string, AgentDefinitionConfig>;
   memoryEnabled?: boolean;
   memoryMaxLines?: number;
@@ -87,8 +87,8 @@ export class AgentService {
       if (options.mcpServers) {
         request.mcpServers = options.mcpServers;
       }
-      if (options.sdkNativeSkills !== undefined) {
-        request.sdkNativeSkills = options.sdkNativeSkills;
+      if (options.loadFilesystemSettings !== undefined) {
+        request.loadFilesystemSettings = options.loadFilesystemSettings;
       }
       if (options.agents) {
         request.agents = options.agents;

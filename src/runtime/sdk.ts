@@ -28,7 +28,7 @@ export interface QueryRequest {
   skillDirectories?: string[];
   tools?: string[];
   mcpServers?: Record<string, SdkMcpServerConfig>;
-  sdkNativeSkills?: boolean;
+  loadFilesystemSettings?: boolean;
   agents?: Record<string, AgentDefinitionConfig>;
   memoryEnabled?: boolean;
   memoryMaxLines?: number;
@@ -121,8 +121,8 @@ export async function queryAgent(
     mcp: {
       servers: request.mcpServers ?? {}
     },
-    skills: {
-      sdkNative: request.sdkNativeSkills ?? false
+    runtime: {
+      loadFilesystemSettings: request.loadFilesystemSettings ?? false
     },
     agents: request.agents ?? {}
   });
@@ -227,7 +227,7 @@ function createSdkQueryOptions(params: {
     options.mcpServers = params.request.mcpServers;
   }
 
-  if (params.request.sdkNativeSkills) {
+  if (params.request.loadFilesystemSettings) {
     options.settingSources = ["user", "project"];
   }
   if (params.agentDefinitions && Object.keys(params.agentDefinitions).length > 0) {

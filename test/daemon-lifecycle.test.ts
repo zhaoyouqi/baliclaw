@@ -45,15 +45,15 @@ const defaultConfig: AppConfig = {
     }
   },
   runtime: {
-    workingDirectory: "/tmp/baliclaw"
+    workingDirectory: "/tmp/baliclaw",
+    loadFilesystemSettings: true
   },
   tools: {
     availableTools: ["Bash", "Read", "Write", "Edit"]
   },
   skills: {
     enabled: true,
-    directories: [],
-    sdkNative: true
+    directories: []
   },
   logging: {
     level: "info"
@@ -187,7 +187,8 @@ describe("bootstrap", () => {
               maxTurns: 6,
               systemPromptFile: "/tmp/system.md",
               soulFile: "/tmp/soul.md",
-              userFile: "/tmp/user.md"
+              userFile: "/tmp/user.md",
+              loadFilesystemSettings: false
             },
             agents: {
               reviewer: {
@@ -197,8 +198,7 @@ describe("bootstrap", () => {
             },
             skills: {
               enabled: true,
-              directories: ["/tmp/skills"],
-              sdkNative: false
+              directories: ["/tmp/skills"]
             },
             tools: {
               availableTools: ["Read", "Write"]
@@ -244,7 +244,7 @@ describe("bootstrap", () => {
           soulFile: "/tmp/soul.md",
           userFile: "/tmp/user.md",
           skillDirectories: ["/tmp/skills"],
-          sdkNativeSkills: false,
+          loadFilesystemSettings: false,
           agents: {
             reviewer: {
               description: "Review code",
@@ -375,12 +375,12 @@ describe("bootstrap", () => {
           workingDirectory: "/tmp/runtime-1",
           model: "claude-sonnet",
           maxTurns: 4,
-          systemPromptFile: "/tmp/system-1.md"
+          systemPromptFile: "/tmp/system-1.md",
+          loadFilesystemSettings: true
         },
         skills: {
           enabled: true,
-          directories: ["/tmp/skills-1"],
-          sdkNative: true
+          directories: ["/tmp/skills-1"]
         },
         tools: {
           availableTools: ["Read"]
@@ -401,12 +401,12 @@ describe("bootstrap", () => {
           workingDirectory: "/tmp/runtime-2",
           model: "claude-opus",
           maxTurns: 9,
-          systemPromptFile: "/tmp/system-2.md"
+          systemPromptFile: "/tmp/system-2.md",
+          loadFilesystemSettings: true
         },
         skills: {
           enabled: true,
-          directories: ["/tmp/skills-2"],
-          sdkNative: true
+          directories: ["/tmp/skills-2"]
         },
         tools: {
           availableTools: ["Bash", "Write"]
@@ -469,7 +469,7 @@ describe("bootstrap", () => {
           maxTurns: 4,
           systemPromptFile: "/tmp/system-1.md",
           skillDirectories: ["/tmp/skills-1"],
-          sdkNativeSkills: true,
+          loadFilesystemSettings: true,
           memoryEnabled: true,
           memoryMaxLines: 200,
           tools: ["Read"]
@@ -485,7 +485,7 @@ describe("bootstrap", () => {
           maxTurns: 9,
           systemPromptFile: "/tmp/system-2.md",
           skillDirectories: ["/tmp/skills-2"],
-          sdkNativeSkills: true,
+          loadFilesystemSettings: true,
           memoryEnabled: true,
           memoryMaxLines: 200,
           tools: ["Bash", "Write"]
@@ -591,7 +591,8 @@ describe("bootstrap", () => {
               }
             },
             runtime: {
-              workingDirectory: "/tmp/shared-runtime"
+              workingDirectory: "/tmp/shared-runtime",
+              loadFilesystemSettings: true
             }
           })
         } as never
@@ -626,7 +627,7 @@ describe("bootstrap", () => {
           cwd: "/tmp/shared-runtime",
           sessionId: "telegram:default:direct:41",
           skillDirectories: [],
-          sdkNativeSkills: true,
+          loadFilesystemSettings: true,
           memoryEnabled: true,
           memoryMaxLines: 200,
           tools: ["Bash", "Read", "Write", "Edit"]
@@ -639,7 +640,7 @@ describe("bootstrap", () => {
           cwd: "/tmp/shared-runtime",
           sessionId: "telegram:default:direct:42",
           skillDirectories: [],
-          sdkNativeSkills: true,
+          loadFilesystemSettings: true,
           memoryEnabled: true,
           memoryMaxLines: 200,
           tools: ["Bash", "Read", "Write", "Edit"]

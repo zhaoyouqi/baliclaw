@@ -148,7 +148,7 @@ Phase 2 完成后，系统应满足：
 
 ---
 
-### T04. 扩展 config schema — skills.sdkNative + runtime.soulFile + runtime.userFile
+### T04. 扩展 config schema — runtime.loadFilesystemSettings + runtime.soulFile + runtime.userFile
 
 目标：在现有 config schema 中新增 Phase 2 字段。
 
@@ -156,13 +156,13 @@ Phase 2 完成后，系统应满足：
 - `phase2-design-spec.md` 第 5.4、8.5、9.5、12 章
 
 产出：
-- `skills` schema 新增 `sdkNative` 字段（默认 true）
+- `runtime` schema 新增 `loadFilesystemSettings` 字段（默认 true）
 - `runtime` schema 新增 `soulFile` 字段（可选）
 - `runtime` schema 新增 `userFile` 字段（可选）
 
 验收标准：
 - 不配置新增字段时，行为不变
-- `skills.sdkNative` 默认为 true
+- `runtime.loadFilesystemSettings` 默认为 true
 - `runtime.soulFile` 和 `runtime.userFile` 为可选字符串
 - 现有测试不回归
 
@@ -183,7 +183,7 @@ Phase 2 完成后，系统应满足：
 验收标准：
 - 基础工具列表来自 `tools.availableTools`（与 Phase 1 一致）
 - 每个配置的 MCP server 追加 `mcp__<name>__*` 通配符
-- `skills.sdkNative` 为 true 时追加 `"Skill"`
+- `runtime.loadFilesystemSettings` 为 true 时追加 `"Skill"`
 - `agents` 配置非空时追加 `"Agent"`
 - 用户手动在 `tools.availableTools` 中包含 `"Agent"` 时不重复
 - 空配置时输出与 Phase 1 完全一致
@@ -191,7 +191,7 @@ Phase 2 完成后，系统应满足：
 依赖：
 - T01（MCP schema）
 - T02（agents schema）
-- T04（skills.sdkNative）
+- T04（runtime.loadFilesystemSettings）
 
 ---
 
@@ -227,15 +227,15 @@ Phase 2 完成后，系统应满足：
 
 产出：
 - `runtime/sdk.ts` 更新 — 支持 `settingSources`
-- `runtime/agent-service.ts` 更新 — `AgentRunOptions` 新增 `sdkNativeSkills`
+- `runtime/agent-service.ts` 更新 — `AgentRunOptions` 新增 `loadFilesystemSettings`
 
 验收标准：
-- `skills.sdkNative` 为 true 时，`query()` options 包含 `settingSources: ["user", "project"]`
-- `skills.sdkNative` 为 false 时，不传 `settingSources`
+- `runtime.loadFilesystemSettings` 为 true 时，`query()` options 包含 `settingSources: ["user", "project"]`
+- `runtime.loadFilesystemSettings` 为 false 时，不传 `settingSources`
 - Phase 1 prompt-only skills 在两种模式下都继续正常工作
 
 依赖：
-- T04（skills.sdkNative schema）
+- T04（runtime.loadFilesystemSettings schema）
 - T05（tool policy）
 
 ---
@@ -372,7 +372,7 @@ Phase 2 完成后，系统应满足：
 
 验收标准：
 - `mcpServers` 从 `config.mcp.servers` 透传
-- `sdkNativeSkills` 从 `config.skills.sdkNative` 透传
+- `loadFilesystemSettings` 从 `config.runtime.loadFilesystemSettings` 透传
 - `agents` 从 `config.agents` 透传
 - `soulFile` 从 `config.runtime.soulFile` 透传
 - `userFile` 从 `config.runtime.userFile` 透传
@@ -425,7 +425,7 @@ Phase 2 完成后，系统应满足：
 - agent 缺少 description 时校验失败
 - agent 缺少 prompt 和 promptFile 时校验失败
 - memory 默认值正确
-- skills.sdkNative 默认为 true
+- runtime.loadFilesystemSettings 默认为 true
 - 空配置时所有新增段有正确默认值
 - 完整 Phase 1 配置通过校验不回归
 
@@ -442,9 +442,9 @@ Phase 2 完成后，系统应满足：
 - `test/tool-policy-phase2.test.ts`（或扩展现有测试文件）
 
 验收标准：
-- 无 MCP、无 agents、sdkNative=false 时，输出与 Phase 1 一致
+- 无 MCP、无 agents、loadFilesystemSettings=false 时，输出与 Phase 1 一致
 - 配置 MCP server 后，输出包含对应通配符
-- sdkNative=true 时，输出包含 `"Skill"`
+- loadFilesystemSettings=true 时，输出包含 `"Skill"`
 - 配置 agents 后，输出包含 `"Agent"`
 - 用户手动在 availableTools 中包含 `"Agent"` 时不重复
 - 多个 MCP server 时，每个 server 都有对应通配符
@@ -526,7 +526,7 @@ Phase 2 完成后，系统应满足：
 验收标准：
 - `baliclaw config set mcp.servers.github.command npx` 可用
 - `baliclaw config set memory.enabled false` 可用
-- `baliclaw config set skills.sdkNative false` 可用
+- `baliclaw config set runtime.loadFilesystemSettings false` 可用
 - 设置非法值时返回校验错误
 
 依赖：

@@ -66,7 +66,7 @@ describe("AgentService", () => {
       userFile: "/tmp/user.md",
       skillDirectories: ["/tmp/skills"],
       tools: ["Read", "Bash"],
-      sdkNativeSkills: true,
+      loadFilesystemSettings: true,
       agents: {
         reviewer: {
           description: "Review code",
@@ -89,7 +89,7 @@ describe("AgentService", () => {
       userFile: "/tmp/user.md",
       skillDirectories: ["/tmp/skills"],
       tools: ["Read", "Bash"],
-      sdkNativeSkills: true,
+      loadFilesystemSettings: true,
       agents: {
         reviewer: {
           description: "Review code",

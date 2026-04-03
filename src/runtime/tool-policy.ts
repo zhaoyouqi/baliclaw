@@ -18,7 +18,7 @@ export function getToolPolicy(
   config: {
     tools: Pick<AppConfig["tools"], "availableTools">;
     mcp: { servers: Record<string, unknown> };
-    skills: Pick<AppConfig["skills"], "sdkNative">;
+    runtime: Pick<AppConfig["runtime"], "loadFilesystemSettings">;
     agents: Record<string, unknown>;
   }
 ): ToolPolicy {
@@ -31,7 +31,7 @@ export function getToolPolicy(
     }
   }
 
-  if (config.skills.sdkNative && !tools.includes("Skill")) {
+  if (config.runtime.loadFilesystemSettings && !tools.includes("Skill")) {
     tools.push("Skill");
   }
 

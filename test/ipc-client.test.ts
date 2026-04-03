@@ -62,15 +62,15 @@ describe("IpcClient", () => {
         }
       },
       runtime: {
-        workingDirectory: "/tmp/baliclaw"
+        workingDirectory: "/tmp/baliclaw",
+        loadFilesystemSettings: true
       },
       tools: {
         availableTools: ["Bash"]
       },
       skills: {
         enabled: true,
-        directories: [],
-        sdkNative: true
+        directories: []
       },
       logging: {
         level: "info"

@@ -63,7 +63,7 @@ describe("queryAgent", () => {
             args: ["-y", "@modelcontextprotocol/server-github"]
           }
         },
-        sdkNativeSkills: true,
+        loadFilesystemSettings: true,
         agents: {
           reviewer: {
             description: "Review code",

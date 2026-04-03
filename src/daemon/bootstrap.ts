@@ -254,7 +254,7 @@ function buildAgentRunOptions(config: AppConfig, sessionId: string): Parameters<
   if (config.skills.enabled) {
     options.skillDirectories = config.skills.directories;
   }
-  options.sdkNativeSkills = config.skills.sdkNative;
+  options.loadFilesystemSettings = config.runtime.loadFilesystemSettings;
 
   if (Object.keys(config.mcp.servers).length > 0) {
     options.mcpServers = config.mcp.servers;

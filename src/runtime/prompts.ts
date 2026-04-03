@@ -10,13 +10,19 @@ export interface PromptSkill {
 
 export interface BuildSystemPromptOptions {
   workingDirectory: string;
+  soulFile?: string;
   systemPromptFile?: string;
   skillPrompts?: PromptSkill[];
 }
 
 export async function buildSystemPrompt(options: BuildSystemPromptOptions): Promise<string> {
   const sections: string[] = [baseSystemPrompt];
+  const soulContent = await readOptionalTextFile(options.soulFile ?? join(options.workingDirectory, "SOUL.md"));
   const agentsContent = await readOptionalTextFile(join(options.workingDirectory, "AGENTS.md"));
+
+  if (soulContent) {
+    sections.push(renderSection("SOUL.md", soulContent));
+  }
 
   if (agentsContent) {
     sections.push(renderSection("AGENTS.md", agentsContent));

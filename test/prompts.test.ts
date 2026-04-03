@@ -24,6 +24,7 @@ describe("buildSystemPrompt", () => {
     const extraPromptFile = join(workingDirectory, "extra-prompt.md");
 
     try {
+      await writeFile(join(workingDirectory, "SOUL.md"), "Agent soul", "utf8");
       await writeFile(join(workingDirectory, "AGENTS.md"), "Repository rules", "utf8");
       await writeFile(extraPromptFile, "Extra runtime instructions", "utf8");
 
@@ -45,6 +46,7 @@ describe("buildSystemPrompt", () => {
       expect(prompt).toBe(
         [
           "You are the BaliClaw Phase 1 agent.",
+          "=== SOUL.md ===\nAgent soul",
           "=== AGENTS.md ===\nRepository rules",
           "=== SYSTEM PROMPT ===\nExtra runtime instructions",
           "=== SKILL: foo ===\nSkill foo instructions",
@@ -77,6 +79,27 @@ describe("buildSystemPrompt", () => {
 
       expect(prompt).toBe("You are the BaliClaw Phase 1 agent.");
     } finally {
+      await rm(workingDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("uses the configured soul file path before the working directory default", async () => {
+    const workingDirectory = await mkdtemp(join(tmpdir(), "baliclaw-prompts-soul-"));
+    const customSoulFile = join(tmpdir(), `baliclaw-custom-soul-${Date.now()}.md`);
+
+    try {
+      await writeFile(join(workingDirectory, "SOUL.md"), "Default soul", "utf8");
+      await writeFile(customSoulFile, "Configured soul", "utf8");
+
+      const prompt = await buildSystemPrompt({
+        workingDirectory,
+        soulFile: customSoulFile
+      });
+
+      expect(prompt).toContain("=== SOUL.md ===\nConfigured soul");
+      expect(prompt).not.toContain("Default soul");
+    } finally {
+      await rm(customSoulFile, { force: true });
       await rm(workingDirectory, { recursive: true, force: true });
     }
   });

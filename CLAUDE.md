@@ -66,6 +66,13 @@ Vitest. Tests in `test/`, named after the unit (e.g., `stable-key.test.ts`). Cri
 
 ## Reference Docs
 
-- `design-spec.md` — Product scope, architecture, boundaries
-- `tech-spec.md` — Implementation details and module layout
-- `task-list.md` — Milestones and executable tasks
+### Phase 1
+
+- `docs/phase1/design-spec.md` — Product scope, architecture, boundaries
+- `docs/phase1/tech-spec.md` — Implementation details and module layout
+- `docs/phase1/task-list.md` — Milestones and executable tasks
+
+### Phase 2
+
+- `docs/phase2/phase2-design-spec.md` — Skills, MCP, SubAgents, personalization design
+- `docs/phase2/phase2-task-list.md` — Phase 2 milestones and executable tasks

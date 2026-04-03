@@ -153,17 +153,32 @@ function toUserFacingFailureMessage(error: unknown): string {
     return `${permissionDeniedPrefix}${permissionDeniedReason}`;
   }
 
-  return genericAgentFailureMessage;
+  const rootCause = extractRootCause(rawMessage);
+  return rootCause ? `${genericAgentFailureMessage} Root cause: ${rootCause}` : genericAgentFailureMessage;
 }
 
 function extractPermissionDeniedReason(message: string): string | null {
-  const firstLine = message.split("\n")[0]?.trim();
+  const firstLine = extractRootCause(message);
   if (!firstLine) {
     return null;
   }
 
   const normalized = firstLine.toLowerCase();
   if (!normalized.includes("permission to use")) {
+    return null;
+  }
+
+  const sdkPrefix = "Claude Agent SDK failed: ";
+  if (firstLine.startsWith(sdkPrefix)) {
+    return firstLine.slice(sdkPrefix.length).trim();
+  }
+
+  return firstLine;
+}
+
+function extractRootCause(message: string): string | null {
+  const firstLine = message.split("\n")[0]?.trim();
+  if (!firstLine) {
     return null;
   }
 

@@ -160,7 +160,7 @@ describe("AgentService", () => {
     expect(destination.write).toHaveBeenCalled();
   });
 
-  it("returns a generic readable failure message for unexpected errors", async () => {
+  it("includes the root cause in the generic failure message for unexpected errors", async () => {
     const destination = { write: vi.fn(() => true) };
     const logger = createLogger({ subsystem: "agent", destination });
     const service = new AgentService({
@@ -173,7 +173,7 @@ describe("AgentService", () => {
     });
 
     await expect(service.handleMessage(makeMessage("hello"), "/tmp/project")).resolves.toBe(
-      "Sorry, I ran into an internal error while processing your request."
+      "Sorry, I ran into an internal error while processing your request. Root cause: network broke"
     );
     expect(destination.write).toHaveBeenCalled();
   });

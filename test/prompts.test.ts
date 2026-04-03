@@ -32,6 +32,9 @@ describe("buildSystemPrompt", () => {
       const prompt = await buildSystemPrompt({
         workingDirectory,
         systemPromptFile: extraPromptFile,
+        memoryEnabled: true,
+        memoryFilePath: "/tmp/.baliclaw/memory/projects/abc123/MEMORY.md",
+        memoryContent: "Remember this",
         skillPrompts: [
           {
             name: "foo",
@@ -58,6 +61,31 @@ describe("buildSystemPrompt", () => {
           ].join("\n"),
           "=== AGENTS.md ===\nRepository rules",
           "=== SYSTEM PROMPT ===\nExtra runtime instructions",
+          [
+            "=== PERSISTENT MEMORY ===",
+            "You have a persistent memory file at /tmp/.baliclaw/memory/projects/abc123/MEMORY.md. Its current contents are shown below.",
+            "",
+            "## How to use memory:",
+            "- Use the Edit or Write tool to update this file when you learn important information",
+            "- Organize by topic, not chronologically",
+            "- Keep it concise - this file is injected into every conversation",
+            "- Remove outdated information when you notice it",
+            "",
+            "## What to remember:",
+            "- Project architecture decisions and conventions",
+            "- Recurring patterns and solutions",
+            "- Important context from past conversations",
+            "- Things the user explicitly asks you to remember",
+            "",
+            "## What NOT to remember:",
+            "- Transient task details or in-progress state",
+            "- Information already documented in project files",
+            "- Sensitive credentials or secrets",
+            "- Anything redundant with SOUL.md or USER.md",
+            "",
+            "## Current memory contents:",
+            "Remember this"
+          ].join("\n"),
           "=== SKILL: foo ===\nSkill foo instructions",
           "=== SKILL: bar ===\nSkill bar instructions"
         ].join("\n\n")
@@ -130,6 +158,25 @@ describe("buildSystemPrompt", () => {
       expect(prompt).not.toContain("Default user");
     } finally {
       await rm(customUserFile, { force: true });
+      await rm(workingDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("includes the memory section even when memory content is empty", async () => {
+    const workingDirectory = await mkdtemp(join(tmpdir(), "baliclaw-prompts-memory-empty-"));
+
+    try {
+      const prompt = await buildSystemPrompt({
+        workingDirectory,
+        memoryEnabled: true,
+        memoryFilePath: "/tmp/.baliclaw/memory/projects/empty/MEMORY.md",
+        memoryContent: ""
+      });
+
+      expect(prompt).toContain("=== PERSISTENT MEMORY ===");
+      expect(prompt).toContain("/tmp/.baliclaw/memory/projects/empty/MEMORY.md");
+      expect(prompt).toContain("## Current memory contents:\n(empty)");
+    } finally {
       await rm(workingDirectory, { recursive: true, force: true });
     }
   });

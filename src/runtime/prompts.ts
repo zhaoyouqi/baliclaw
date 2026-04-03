@@ -13,6 +13,9 @@ export interface BuildSystemPromptOptions {
   soulFile?: string;
   userFile?: string;
   systemPromptFile?: string;
+  memoryEnabled?: boolean;
+  memoryContent?: string;
+  memoryFilePath?: string;
   skillPrompts?: PromptSkill[];
 }
 
@@ -38,6 +41,14 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions): Prom
     if (extraPrompt) {
       sections.push(renderSection("SYSTEM PROMPT", extraPrompt));
     }
+  }
+
+  if (options.memoryEnabled) {
+    if (!options.memoryFilePath) {
+      throw new Error("memoryFilePath is required when memoryEnabled is true");
+    }
+
+    sections.push(renderMemorySection(options.memoryFilePath, options.memoryContent ?? ""));
   }
 
   for (const skill of options.skillPrompts ?? []) {
@@ -74,6 +85,36 @@ function renderUserSection(content: string): string {
     "Keep it concise and avoid sensitive information that does not improve future help.",
     "",
     content.trim()
+  ].join("\n");
+}
+
+function renderMemorySection(memoryFilePath: string, memoryContent: string): string {
+  const trimmedContent = memoryContent.trim();
+
+  return [
+    "=== PERSISTENT MEMORY ===",
+    `You have a persistent memory file at ${memoryFilePath}. Its current contents are shown below.`,
+    "",
+    "## How to use memory:",
+    "- Use the Edit or Write tool to update this file when you learn important information",
+    "- Organize by topic, not chronologically",
+    "- Keep it concise - this file is injected into every conversation",
+    "- Remove outdated information when you notice it",
+    "",
+    "## What to remember:",
+    "- Project architecture decisions and conventions",
+    "- Recurring patterns and solutions",
+    "- Important context from past conversations",
+    "- Things the user explicitly asks you to remember",
+    "",
+    "## What NOT to remember:",
+    "- Transient task details or in-progress state",
+    "- Information already documented in project files",
+    "- Sensitive credentials or secrets",
+    "- Anything redundant with SOUL.md or USER.md",
+    "",
+    "## Current memory contents:",
+    trimmedContent.length > 0 ? trimmedContent : "(empty)"
   ].join("\n");
 }
 

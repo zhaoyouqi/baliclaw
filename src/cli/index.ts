@@ -5,6 +5,7 @@ import { runConfigGetCommand, runConfigSetCommand } from "./commands/config.js";
 import { runDaemonCommand } from "./commands/daemon.js";
 import { runPairingApproveCommand, runPairingListCommand } from "./commands/pairing.js";
 import { runStatusCommand } from "./commands/status.js";
+import { runTuiCommand } from "./commands/tui.js";
 
 const program = new Command();
 
@@ -18,6 +19,14 @@ program
   .description("Show daemon status")
   .action(async () => {
     console.log(await runStatusCommand());
+  });
+
+
+program
+  .command("tui")
+  .description("Run a local terminal chat interface")
+  .action(async () => {
+    await runTuiCommand();
   });
 
 const configCommand = program

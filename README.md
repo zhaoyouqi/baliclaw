@@ -156,6 +156,7 @@ node dist/cli/index.js config get
 node dist/cli/index.js config set --path channels.telegram.botToken '<TOKEN>'
 node dist/cli/index.js pairing list telegram
 node dist/cli/index.js pairing approve telegram <CODE>
+node dist/cli/index.js tui
 ```
 
 Current CLI command groups:
@@ -167,6 +168,7 @@ Current CLI command groups:
 - `pairing list telegram`
 - `pairing approve telegram <CODE>`
 - `daemon start`
+- `tui`
 
 ## Configuration
 

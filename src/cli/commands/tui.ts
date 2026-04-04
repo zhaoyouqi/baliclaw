@@ -56,7 +56,12 @@ export async function runTuiCommand(dependencies: TuiCommandDependencies = {}): 
 
   try {
     while (true) {
-      const raw = await readline.question("you> ");
+      const raw = await readTuiQuestion(readline);
+      if (raw === null) {
+        writeLine("Bye.");
+        break;
+      }
+
       const input = parseTuiInput(raw);
 
       if (input.command) {
@@ -176,4 +181,25 @@ export function createLocalTuiMessage(prompt: string): InboundMessage {
 
 export function createTuiSessionId(now: Date = new Date()): string {
   return `tui-${now.toISOString()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function readTuiQuestion(readline: Interface): Promise<string | null> {
+  try {
+    return await readline.question("you> ");
+  } catch (error) {
+    if (isReadlineAbortError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+function isReadlineAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    error.name === "AbortError"
+  );
 }

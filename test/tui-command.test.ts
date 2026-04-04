@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { buildTuiAgentRunOptions, parseTuiInput } from "../src/cli/commands/tui.js";
+import { describe, expect, it, vi } from "vitest";
+import type { Interface } from "node:readline/promises";
+import { buildTuiAgentRunOptions, parseTuiInput, runTuiCommand } from "../src/cli/commands/tui.js";
 import type { AppConfig } from "../src/config/schema.js";
 
 const baseConfig: AppConfig = {
@@ -104,5 +105,33 @@ describe("TUI command helpers", () => {
 
     const options = buildTuiAgentRunOptions(config, "tui-session-2");
     expect(options.skillDirectories).toBeUndefined();
+  });
+
+  it("exits cleanly when readline is aborted", async () => {
+    const writeLine = vi.fn();
+    const close = vi.fn();
+    const question = vi.fn().mockRejectedValue(Object.assign(new Error("aborted"), { name: "AbortError" }));
+
+    await expect(
+      runTuiCommand({
+        configService: {
+          load: vi.fn().mockResolvedValue(baseConfig)
+        },
+        agentService: {
+          handleMessage: vi.fn()
+        },
+        createReadline: () =>
+          ({
+            question,
+            close
+          }) as unknown as Interface,
+        writeLine
+      })
+    ).resolves.toBe("TUI closed.");
+
+    expect(writeLine).toHaveBeenCalledWith("BaliClaw local TUI started.");
+    expect(writeLine).toHaveBeenCalledWith("Type your prompt, or use /help for commands.");
+    expect(writeLine).toHaveBeenCalledWith("Bye.");
+    expect(close).toHaveBeenCalled();
   });
 });

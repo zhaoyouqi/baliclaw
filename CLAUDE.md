@@ -6,6 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 BaliClaw is a local-first AI gateway for Telegram DM workflows. It bridges Telegram messaging with Anthropic's Claude Agent SDK, running as a local daemon (`baliclawd`) with CLI control (`baliclaw`). Phase 2 extends the Phase 1 transport with MCP server passthrough, SDK native Skills, SubAgents, and file-backed personalization (`SOUL.md`, `USER.md`, `MEMORY.md`). Node.js 22+, TypeScript, ESM, pnpm only.
 
+## Repository Info
+
+- GitHub repository: `zhaoyouqi/baliclaw`
+- HTTPS remote: `https://github.com/zhaoyouqi/baliclaw.git`
+- Issues are tracked on GitHub: `https://github.com/zhaoyouqi/baliclaw/issues`
+
 ## Commands
 
 ```bash

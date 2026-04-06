@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { AgentService } from "../src/runtime/agent-service.js";
+import { SessionContextStore } from "../src/runtime/session-context-store.js";
 import { createLogger } from "../src/shared/logger.js";
 import type { InboundMessage } from "../src/shared/types.js";
 
@@ -199,6 +200,93 @@ describe("AgentService", () => {
     await expect(service.resetSession("telegram:default:direct:42")).resolves.toBeUndefined();
 
     expect(sessionMapStore.delete).toHaveBeenCalledWith("telegram:default:direct:42");
+    expect(queryAgent).not.toHaveBeenCalled();
+  });
+
+  it("reports when the SDK auto-compacted during a normal turn", async () => {
+    const queryAgent = vi.fn().mockResolvedValue({
+      text: "done",
+      sessionId: "claude-session-existing",
+      compaction: {
+        trigger: "auto",
+        preTokens: 170000
+      },
+      usage: {
+        estimatedInputTokens: 1200
+      }
+    });
+    const sessionMapStore = {
+      get: vi.fn().mockResolvedValue("claude-session-existing"),
+      set: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined)
+    };
+    const service = new AgentService({
+      runQueryAgent: queryAgent,
+      sessionMapStore,
+      sessionContextStore: new SessionContextStore()
+    });
+
+    await expect(service.handleMessageWithMetadata(makeMessage("hello"), "/tmp/project")).resolves.toEqual({
+      text: "done",
+      autoCompacted: true,
+      autoCompactionPreTokens: 170000
+    });
+
+    expect(queryAgent).toHaveBeenCalledWith({
+      prompt: "hello",
+      sessionId: "telegram:default:direct:42",
+      resumeSessionId: "claude-session-existing",
+      cwd: "/tmp/project"
+    });
+  });
+
+  it("compacts the current session on demand when a Claude session already exists", async () => {
+    const queryAgent = vi.fn().mockResolvedValue({
+      text: "Compacted",
+      sessionId: "claude-session-existing",
+      compaction: {
+        trigger: "manual",
+        preTokens: 45678
+      }
+    });
+    const sessionMapStore = {
+      get: vi.fn().mockResolvedValue("claude-session-existing"),
+      set: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined)
+    };
+    const service = new AgentService({
+      runQueryAgent: queryAgent,
+      sessionMapStore
+    });
+
+    await expect(service.compactSession(makeMessage("/compact"), "/tmp/project")).resolves.toBe(
+      "Compacted the current session. Previous context was about 45678 tokens."
+    );
+
+    expect(queryAgent).toHaveBeenCalledWith({
+      prompt: "/compact",
+      sessionId: "telegram:default:direct:42",
+      resumeSessionId: "claude-session-existing",
+      cwd: "/tmp/project",
+      maxTurns: 1
+    });
+  });
+
+  it("returns a readable message when the user tries to compact before any active session exists", async () => {
+    const queryAgent = vi.fn();
+    const sessionMapStore = {
+      get: vi.fn().mockResolvedValue(undefined),
+      set: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined)
+    };
+    const service = new AgentService({
+      runQueryAgent: queryAgent,
+      sessionMapStore
+    });
+
+    await expect(service.compactSession(makeMessage("/compact"), "/tmp/project")).resolves.toBe(
+      "No active session to compact yet. Send a message first."
+    );
     expect(queryAgent).not.toHaveBeenCalled();
   });
 });

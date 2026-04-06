@@ -29,6 +29,23 @@ describe("queryAgent", () => {
       };
     }) {
       yield {
+        type: "system" as const,
+        subtype: "status" as const,
+        status: "compacting" as const,
+        uuid: "status-uuid",
+        session_id: "session"
+      };
+      yield {
+        type: "system" as const,
+        subtype: "compact_boundary" as const,
+        compact_metadata: {
+          trigger: "auto" as const,
+          pre_tokens: 170000
+        },
+        uuid: "compact-uuid",
+        session_id: "session"
+      };
+      yield {
         type: "result" as const,
         subtype: "success" as const,
         duration_ms: 1,
@@ -38,7 +55,11 @@ describe("queryAgent", () => {
         result: "done",
         stop_reason: null,
         total_cost_usd: 0.25,
-        usage: {} as never,
+        usage: {
+          input_tokens: 1234,
+          cache_creation_input_tokens: 12,
+          cache_read_input_tokens: 34
+        } as never,
         modelUsage: {},
         permission_denials: [],
         uuid: "uuid",
@@ -99,7 +120,13 @@ describe("queryAgent", () => {
       sessionId: "session",
       usage: {
         totalCostUsd: 0.25,
-        turns: 2
+        turns: 2,
+        estimatedInputTokens: 1280
+      },
+      compacting: false,
+      compaction: {
+        trigger: "auto",
+        preTokens: 170000
       }
     });
     expect(query).toHaveBeenCalledWith({
@@ -175,7 +202,9 @@ describe("queryAgent", () => {
         result: "ok",
         stop_reason: null,
         total_cost_usd: 0,
-        usage: {} as never,
+        usage: {
+          input_tokens: 777
+        } as never,
         modelUsage: {},
         permission_denials: [],
         uuid: "uuid",

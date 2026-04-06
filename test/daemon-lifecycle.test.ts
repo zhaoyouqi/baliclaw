@@ -158,7 +158,9 @@ describe("bootstrap", () => {
         handler(message, "telegram:default:direct:42"))
     } as never;
     const agentService = {
-      handleMessage: vi.fn().mockResolvedValue("agent reply")
+      handleMessage: vi.fn().mockResolvedValue("agent reply"),
+      handleMessageWithMetadata: vi.fn().mockResolvedValue({ text: "agent reply" }),
+      compactSession: vi.fn()
     } as never;
     const typingHeartbeat = createNoopTypingHeartbeat();
 
@@ -229,7 +231,7 @@ describe("bootstrap", () => {
 
       expect(pairingService.isApprovedSender).toHaveBeenCalledWith("42");
       expect(sessionService.runTurn).toHaveBeenCalledTimes(1);
-      expect(agentService.handleMessage).toHaveBeenCalledWith(
+      expect(agentService.handleMessageWithMetadata).toHaveBeenCalledWith(
         {
           channel: "telegram",
           accountId: "default",
@@ -274,6 +276,93 @@ describe("bootstrap", () => {
     }
   });
 
+  it("notifies the user when the SDK auto-compacts during a turn", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-bootstrap-auto-compact-notice-"));
+    const paths = getAppPaths(home);
+    const bot = new FakeTelegramBot();
+    const sendText = vi.fn<() => Promise<void>>().mockResolvedValue();
+    const pairingService = {
+      isApprovedSender: vi.fn().mockResolvedValue(true),
+      getOrCreatePendingRequest: vi.fn()
+    } as never;
+    const sessionService = {
+      runTurn: vi.fn(async (message: InboundMessage, handler: (message: InboundMessage, sessionId: string) => Promise<void>) =>
+        handler(message, "telegram:default:direct:42"))
+    } as never;
+    const agentService = {
+      handleMessage: vi.fn(),
+      handleMessageWithMetadata: vi.fn().mockResolvedValue({
+        text: "agent reply",
+        autoCompacted: true,
+        autoCompactionPreTokens: 170000
+      }),
+      compactSession: vi.fn()
+    } as never;
+    const typingHeartbeat = createNoopTypingHeartbeat();
+
+    try {
+      await bootstrap({
+        paths,
+        telegramBot: bot,
+        sendText,
+        createTypingHeartbeat: () => typingHeartbeat,
+        pairingService,
+        sessionService,
+        agentService,
+        ipcServer: {
+          start: vi.fn<() => Promise<void>>().mockResolvedValue(),
+          stop: vi.fn<() => Promise<void>>().mockResolvedValue()
+        } as never,
+        configService: {
+          load: vi.fn<() => Promise<AppConfig>>().mockResolvedValue({
+            ...defaultConfig,
+            channels: {
+              telegram: {
+                enabled: true,
+                botToken: "secret"
+              }
+            }
+          })
+        } as never
+      });
+
+      bot.handler?.({
+        update: {
+          message: {
+            from: { id: 42 },
+            chat: { id: 42, type: "private" },
+            text: "hello"
+          }
+        }
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(sendText).toHaveBeenNthCalledWith(
+        1,
+        {
+          channel: "telegram",
+          accountId: "default",
+          chatType: "direct",
+          conversationId: "42"
+        },
+        "Session context was automatically compacted at about 170000 tokens so the conversation could continue."
+      );
+      expect(sendText).toHaveBeenNthCalledWith(
+        2,
+        {
+          channel: "telegram",
+          accountId: "default",
+          chatType: "direct",
+          conversationId: "42"
+        },
+        "agent reply"
+      );
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
   it("routes /new through the session queue, resets the Claude session map, and sends a confirmation", async () => {
     const home = await mkdtemp(join(tmpdir(), "baliclaw-bootstrap-reset-"));
     const paths = getAppPaths(home);
@@ -289,7 +378,9 @@ describe("bootstrap", () => {
     } as never;
     const agentService = {
       handleMessage: vi.fn(),
-      resetSession: vi.fn().mockResolvedValue(undefined)
+      handleMessageWithMetadata: vi.fn(),
+      resetSession: vi.fn().mockResolvedValue(undefined),
+      compactSession: vi.fn()
     } as never;
 
     try {
@@ -333,7 +424,7 @@ describe("bootstrap", () => {
       expect(pairingService.isApprovedSender).toHaveBeenCalledWith("42");
       expect(sessionService.runTurn).toHaveBeenCalledTimes(1);
       expect(agentService.resetSession).toHaveBeenCalledWith("telegram:default:direct:42");
-      expect(agentService.handleMessage).not.toHaveBeenCalled();
+      expect(agentService.handleMessageWithMetadata).not.toHaveBeenCalled();
       expect(sendText).toHaveBeenCalledWith(
         {
           channel: "telegram",
@@ -343,6 +434,102 @@ describe("bootstrap", () => {
         },
         "Started a fresh session. Your next message will use a new Claude session."
       );
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("routes /compact through the session queue, runs compaction, and sends a confirmation", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-bootstrap-compact-"));
+    const paths = getAppPaths(home);
+    const bot = new FakeTelegramBot();
+    const sendText = vi.fn<() => Promise<void>>().mockResolvedValue();
+    const pairingService = {
+      isApprovedSender: vi.fn().mockResolvedValue(true),
+      getOrCreatePendingRequest: vi.fn()
+    } as never;
+    const sessionService = {
+      runTurn: vi.fn(async (message: InboundMessage, handler: (message: InboundMessage, sessionId: string) => Promise<string>) =>
+        handler(message, "telegram:default:direct:42"))
+    } as never;
+    const agentService = {
+      handleMessage: vi.fn(),
+      handleMessageWithMetadata: vi.fn(),
+      resetSession: vi.fn(),
+      compactSession: vi.fn().mockResolvedValue("Compacted the current session.")
+    } as never;
+    const typingHeartbeat = createNoopTypingHeartbeat();
+
+    try {
+      await bootstrap({
+        paths,
+        telegramBot: bot,
+        sendText,
+        createTypingHeartbeat: () => typingHeartbeat,
+        pairingService,
+        sessionService,
+        agentService,
+        ipcServer: {
+          start: vi.fn<() => Promise<void>>().mockResolvedValue(),
+          stop: vi.fn<() => Promise<void>>().mockResolvedValue()
+        } as never,
+        configService: {
+          load: vi.fn<() => Promise<AppConfig>>().mockResolvedValue({
+            ...defaultConfig,
+            channels: {
+              telegram: {
+                enabled: true,
+                botToken: "secret"
+              }
+            }
+          })
+        } as never
+      });
+
+      bot.handler?.({
+        update: {
+          message: {
+            from: { id: 42 },
+            chat: { id: 42, type: "private" },
+            text: "/compact"
+          }
+        }
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(pairingService.isApprovedSender).toHaveBeenCalledWith("42");
+      expect(sessionService.runTurn).toHaveBeenCalledTimes(1);
+      expect(agentService.compactSession).toHaveBeenCalledWith(
+        {
+          channel: "telegram",
+          accountId: "default",
+          chatType: "direct",
+          conversationId: "42",
+          senderId: "42",
+          text: "/compact"
+        },
+        {
+          cwd: "/tmp/baliclaw",
+          sessionId: "telegram:default:direct:42",
+          skillDirectories: [],
+          loadFilesystemSettings: true,
+          tools: ["Bash", "Read", "Write", "Edit"],
+          memoryEnabled: true,
+          memoryMaxLines: 200
+        }
+      );
+      expect(agentService.handleMessageWithMetadata).not.toHaveBeenCalled();
+      expect(sendText).toHaveBeenCalledWith(
+        {
+          channel: "telegram",
+          accountId: "default",
+          chatType: "direct",
+          conversationId: "42"
+        },
+        "Compacted the current session."
+      );
+      expect(typingHeartbeat.stop).toHaveBeenCalledTimes(1);
     } finally {
       await rm(home, { recursive: true, force: true });
     }
@@ -366,7 +553,9 @@ describe("bootstrap", () => {
       runTurn: vi.fn()
     } as never;
     const agentService = {
-      handleMessage: vi.fn()
+      handleMessage: vi.fn(),
+      handleMessageWithMetadata: vi.fn(),
+      compactSession: vi.fn()
     } as never;
 
     try {
@@ -412,7 +601,7 @@ describe("bootstrap", () => {
         username: "alice"
       });
       expect(sessionService.runTurn).not.toHaveBeenCalled();
-      expect(agentService.handleMessage).not.toHaveBeenCalled();
+      expect(agentService.handleMessageWithMetadata).not.toHaveBeenCalled();
       expect(sendText).toHaveBeenCalledWith(
         {
           channel: "telegram",
@@ -437,7 +626,9 @@ describe("bootstrap", () => {
       getOrCreatePendingRequest: vi.fn()
     } as never;
     const agentService = {
-      handleMessage: vi.fn().mockResolvedValue("agent reply")
+      handleMessage: vi.fn().mockResolvedValue("agent reply"),
+      handleMessageWithMetadata: vi.fn().mockResolvedValue({ text: "agent reply" }),
+      compactSession: vi.fn()
     } as never;
     const loadedConfigs: AppConfig[] = [
       {
@@ -536,7 +727,7 @@ describe("bootstrap", () => {
       });
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(agentService.handleMessage).toHaveBeenNthCalledWith(
+      expect(agentService.handleMessageWithMetadata).toHaveBeenNthCalledWith(
         1,
         expect.objectContaining({ text: "before reload" }),
         {
@@ -552,7 +743,7 @@ describe("bootstrap", () => {
           tools: ["Read"]
         }
       );
-      expect(agentService.handleMessage).toHaveBeenNthCalledWith(
+      expect(agentService.handleMessageWithMetadata).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({ text: "after reload" }),
         {
@@ -643,7 +834,16 @@ describe("bootstrap", () => {
         });
         callOrder.push(`end:${options.sessionId}`);
         return `reply:${options.sessionId}`;
-      })
+      }),
+      handleMessageWithMetadata: vi.fn(async (_message: InboundMessage, options: { cwd: string; sessionId?: string }) => {
+        callOrder.push(`start:${options.sessionId}`);
+        await new Promise<void>((resolve) => {
+          pendingResolvers.set(options.sessionId ?? "", resolve);
+        });
+        callOrder.push(`end:${options.sessionId}`);
+        return { text: `reply:${options.sessionId}` };
+      }),
+      compactSession: vi.fn()
     } as never;
 
     try {
@@ -696,8 +896,8 @@ describe("bootstrap", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(agentService.handleMessage).toHaveBeenCalledTimes(2);
-      expect(agentService.handleMessage).toHaveBeenNthCalledWith(
+      expect(agentService.handleMessageWithMetadata).toHaveBeenCalledTimes(2);
+      expect(agentService.handleMessageWithMetadata).toHaveBeenNthCalledWith(
         1,
         expect.objectContaining({ senderId: "41", text: "first" }),
         {
@@ -710,7 +910,7 @@ describe("bootstrap", () => {
           tools: ["Bash", "Read", "Write", "Edit"]
         }
       );
-      expect(agentService.handleMessage).toHaveBeenNthCalledWith(
+      expect(agentService.handleMessageWithMetadata).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({ senderId: "42", text: "second" }),
         {

@@ -111,7 +111,15 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
           let reply: string;
 
           try {
-            reply = await agentService.handleMessage(turnMessage, agentRunOptions);
+            const result = await agentService.handleMessageWithMetadata(turnMessage, agentRunOptions);
+            reply = result.text;
+
+            if (result.autoCompacted) {
+              const notice = typeof result.autoCompactionPreTokens === "number"
+                ? `Session context was automatically compacted at about ${result.autoCompactionPreTokens} tokens so the conversation could continue.`
+                : "Session context was automatically compacted so the conversation could continue.";
+              await sendText(deliveryTarget, notice);
+            }
           } finally {
             await typingHeartbeat.stop();
           }
@@ -126,6 +134,26 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
       resetSession: async (message) => {
         await sessionService.runTurn(message, async (_turnMessage, sessionId) => {
           await agentService.resetSession(sessionId);
+        });
+        return "Started a fresh session. Your next message will use a new Claude session.";
+      },
+      compactSession: async (message) => {
+        return sessionService.runTurn(message, async (turnMessage, sessionId) => {
+          const runtimeConfig = currentConfig;
+          const agentRunOptions = buildAgentRunOptions(runtimeConfig, sessionId);
+          const deliveryTarget = {
+            channel: turnMessage.channel,
+            accountId: turnMessage.accountId,
+            chatType: turnMessage.chatType,
+            conversationId: turnMessage.conversationId
+          } as const;
+          const typingHeartbeat = await createTypingHeartbeat(deliveryTarget);
+
+          try {
+            return await agentService.compactSession(turnMessage, agentRunOptions);
+          } finally {
+            await typingHeartbeat.stop();
+          }
         });
       },
       sendText

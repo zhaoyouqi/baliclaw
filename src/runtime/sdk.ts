@@ -2,9 +2,11 @@ import { createHash } from "node:crypto";
 import {
   query as sdkQuery,
   type AgentDefinition as SdkAgentDefinition,
+  type SDKCompactBoundaryMessage,
   type SDKMessage,
   type SDKResultError,
   type SDKResultSuccess,
+  type SDKStatusMessage,
   type McpServerConfig as SdkMcpServerConfig
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinitionConfig } from "../config/schema.js";
@@ -37,12 +39,20 @@ export interface QueryRequest {
 export interface QueryUsage {
   totalCostUsd?: number;
   turns?: number;
+  estimatedInputTokens?: number;
+}
+
+export interface QueryCompaction {
+  trigger: "manual" | "auto";
+  preTokens: number;
 }
 
 export interface QueryResult {
   text: string;
   sessionId: string;
   usage?: QueryUsage;
+  compacting?: boolean;
+  compaction?: QueryCompaction;
 }
 
 export interface QueryAgentDependencies {
@@ -169,6 +179,14 @@ function isSdkResultMessage(message: SDKMessage): message is SDKResultSuccess | 
   return message.type === "result";
 }
 
+function isSdkStatusMessage(message: SDKMessage): message is SDKStatusMessage {
+  return message.type === "system" && message.subtype === "status";
+}
+
+function isSdkCompactBoundaryMessage(message: SDKMessage): message is SDKCompactBoundaryMessage {
+  return message.type === "system" && message.subtype === "compact_boundary";
+}
+
 interface SdkQueryOptions {
   cwd: string;
   env: Record<string, string | undefined>;
@@ -251,8 +269,22 @@ async function executeSdkQuery(
   try {
     const stream = runQuery(params);
     let finalResult: SDKResultSuccess | SDKResultError | null = null;
+    let compacting = false;
+    let compaction: QueryCompaction | undefined;
 
     for await (const message of stream) {
+      if (isSdkStatusMessage(message) && message.status === "compacting") {
+        compacting = true;
+      }
+
+      if (isSdkCompactBoundaryMessage(message)) {
+        compacting = false;
+        compaction = {
+          trigger: message.compact_metadata.trigger,
+          preTokens: message.compact_metadata.pre_tokens
+        };
+      }
+
       if (isSdkResultMessage(message)) {
         finalResult = message;
       }
@@ -272,12 +304,45 @@ async function executeSdkQuery(
       sessionId: finalResult.session_id,
       usage: {
         totalCostUsd: finalResult.total_cost_usd,
-        turns: finalResult.num_turns
-      }
+        turns: finalResult.num_turns,
+        estimatedInputTokens: estimateInputTokens(finalResult.usage)
+      },
+      compacting,
+      ...(compaction ? { compaction } : {})
     };
   } catch (error) {
     throw withStderrContext(error, stderrOutput());
   }
+}
+
+function estimateInputTokens(usage: unknown): number | undefined {
+  if (!usage || typeof usage !== "object") {
+    return undefined;
+  }
+
+  const tokenFields = [
+    "input_tokens",
+    "cache_creation_input_tokens",
+    "cache_read_input_tokens"
+  ] as const;
+
+  let total = 0;
+  let matched = false;
+
+  for (const field of tokenFields) {
+    const value = Reflect.get(usage, field);
+    if (typeof value === "number" && Number.isFinite(value)) {
+      total += value;
+      matched = true;
+    }
+  }
+
+  if (matched) {
+    return total;
+  }
+
+  const fallbackTotal = Reflect.get(usage, "total_tokens");
+  return typeof fallbackTotal === "number" && Number.isFinite(fallbackTotal) ? fallbackTotal : undefined;
 }
 
 function toClaudeSessionUuid(sessionId: string): string {

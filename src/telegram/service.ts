@@ -41,7 +41,8 @@ export interface TelegramServiceOptions {
   bot?: TelegramPollingBot;
   enqueueInbound?: (message: InboundMessage) => MaybePromise<unknown>;
   pairingService?: Pick<PairingService, "getOrCreatePendingRequest" | "isApprovedSender">;
-  resetSession?: (message: InboundMessage) => MaybePromise<unknown>;
+  resetSession?: (message: InboundMessage) => MaybePromise<string | undefined>;
+  compactSession?: (message: InboundMessage) => MaybePromise<string | undefined>;
   sendText?: (target: DeliveryTarget, text: string) => MaybePromise<unknown>;
   logger?: Logger;
 }
@@ -53,7 +54,8 @@ export class TelegramService {
   private readonly token: string;
   private readonly enqueueInbound: (message: InboundMessage) => MaybePromise<unknown>;
   private readonly pairingService: Pick<PairingService, "getOrCreatePendingRequest" | "isApprovedSender"> | undefined;
-  private readonly resetSession: ((message: InboundMessage) => MaybePromise<unknown>) | undefined;
+  private readonly resetSession: ((message: InboundMessage) => MaybePromise<string | undefined>) | undefined;
+  private readonly compactSession: ((message: InboundMessage) => MaybePromise<string | undefined>) | undefined;
   private readonly sendText: (target: DeliveryTarget, text: string) => MaybePromise<unknown>;
   private readonly logger: Logger;
   private pollingTask: Promise<void> | null = null;
@@ -65,6 +67,7 @@ export class TelegramService {
     this.enqueueInbound = options.enqueueInbound ?? (() => undefined);
     this.pairingService = options.pairingService;
     this.resetSession = options.resetSession;
+    this.compactSession = options.compactSession;
     this.sendText = options.sendText ?? (() => undefined);
     this.logger = options.logger ?? getLogger("telegram");
 
@@ -121,7 +124,7 @@ export class TelegramService {
     }
 
     if (this.resetSession && isNewSessionCommand(inbound.text)) {
-      await this.resetSession(inbound);
+      const reply = await this.resetSession(inbound);
       await this.sendText(
         {
           channel: "telegram",
@@ -129,7 +132,21 @@ export class TelegramService {
           chatType: "direct",
           conversationId: inbound.conversationId
         },
-        "Started a fresh session. Your next message will use a new Claude session."
+        reply ?? "Started a fresh session. Your next message will use a new Claude session."
+      );
+      return;
+    }
+
+    if (this.compactSession && isCompactSessionCommand(inbound.text)) {
+      const reply = await this.compactSession(inbound);
+      await this.sendText(
+        {
+          channel: "telegram",
+          accountId: "default",
+          chatType: "direct",
+          conversationId: inbound.conversationId
+        },
+        reply ?? "Compacted the current session."
       );
       return;
     }
@@ -152,6 +169,10 @@ export class TelegramService {
 
       await bot.api.setMyCommands(
         [
+          {
+            command: "compact",
+            description: "Compact the current session"
+          },
           {
             command: "new",
             description: "Start a fresh session"
@@ -225,4 +246,9 @@ function toTelegramServiceError(error: unknown): Error {
 function isNewSessionCommand(text: string): boolean {
   const normalized = text.trim();
   return /^\/new(?:@[A-Za-z0-9_]+)?$/.test(normalized);
+}
+
+function isCompactSessionCommand(text: string): boolean {
+  const normalized = text.trim();
+  return /^\/compact(?:@[A-Za-z0-9_]+)?$/.test(normalized);
 }

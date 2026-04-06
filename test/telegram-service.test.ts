@@ -35,6 +35,10 @@ describe("TelegramService", () => {
     expect(bot.api.setMyCommands).toHaveBeenCalledWith(
       [
         {
+          command: "compact",
+          description: "Compact the current session"
+        },
+        {
           command: "new",
           description: "Start a fresh session"
         }
@@ -259,6 +263,79 @@ describe("TelegramService", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(resetSession).toHaveBeenCalledTimes(1);
+    expect(enqueueInbound).not.toHaveBeenCalled();
+    expect(sendText).toHaveBeenCalledTimes(1);
+  });
+
+  it("compacts the current session and skips enqueue for /compact", async () => {
+    const bot = new FakeTelegramBot();
+    const enqueueInbound = vi.fn();
+    const compactSession = vi.fn().mockResolvedValue("Compacted the current session.");
+    const sendText = vi.fn();
+    const pairingService = {
+      isApprovedSender: vi.fn().mockResolvedValue(true),
+      getOrCreatePendingRequest: vi.fn()
+    };
+
+    new TelegramService({ bot, enqueueInbound, pairingService, compactSession, sendText });
+
+    bot.handler?.({
+      update: {
+        message: {
+          from: { id: 7 },
+          chat: { id: 7, type: "private" },
+          text: "/compact"
+        }
+      }
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(compactSession).toHaveBeenCalledWith({
+      channel: "telegram",
+      accountId: "default",
+      chatType: "direct",
+      conversationId: "7",
+      senderId: "7",
+      text: "/compact"
+    });
+    expect(sendText).toHaveBeenCalledWith(
+      {
+        channel: "telegram",
+        accountId: "default",
+        chatType: "direct",
+        conversationId: "7"
+      },
+      "Compacted the current session."
+    );
+    expect(enqueueInbound).not.toHaveBeenCalled();
+  });
+
+  it("accepts /compact@botname as the compact-session command", async () => {
+    const bot = new FakeTelegramBot();
+    const enqueueInbound = vi.fn();
+    const compactSession = vi.fn().mockResolvedValue("Compacted the current session.");
+    const sendText = vi.fn();
+    const pairingService = {
+      isApprovedSender: vi.fn().mockResolvedValue(true),
+      getOrCreatePendingRequest: vi.fn()
+    };
+
+    new TelegramService({ bot, enqueueInbound, pairingService, compactSession, sendText });
+
+    bot.handler?.({
+      update: {
+        message: {
+          from: { id: 7 },
+          chat: { id: 7, type: "private" },
+          text: "/compact@baliclaw_bot"
+        }
+      }
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(compactSession).toHaveBeenCalledTimes(1);
     expect(enqueueInbound).not.toHaveBeenCalled();
     expect(sendText).toHaveBeenCalledTimes(1);
   });

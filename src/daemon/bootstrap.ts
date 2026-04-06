@@ -123,6 +123,11 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
           await sendText(deliveryTarget, reply);
         });
       },
+      resetSession: async (message) => {
+        await sessionService.runTurn(message, async (_turnMessage, sessionId) => {
+          await agentService.resetSession(sessionId);
+        });
+      },
       sendText
     };
 

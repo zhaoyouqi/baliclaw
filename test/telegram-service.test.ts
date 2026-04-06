@@ -8,6 +8,9 @@ interface RegisteredHandler {
 
 class FakeTelegramBot {
   handler: RegisteredHandler | undefined;
+  api = {
+    setMyCommands: vi.fn(async () => true as const)
+  };
   start = vi.fn(async (options?: { onStart?: () => unknown }) => {
     await options?.onStart?.();
   });
@@ -28,6 +31,20 @@ describe("TelegramService", () => {
     await service.stop();
     await service.stop();
 
+    expect(bot.api.setMyCommands).toHaveBeenCalledTimes(1);
+    expect(bot.api.setMyCommands).toHaveBeenCalledWith(
+      [
+        {
+          command: "new",
+          description: "Start a fresh session"
+        }
+      ],
+      {
+        scope: {
+          type: "all_private_chats"
+        }
+      }
+    );
     expect(bot.start).toHaveBeenCalledTimes(1);
     expect(bot.stop).toHaveBeenCalledTimes(1);
   });
@@ -44,6 +61,7 @@ describe("TelegramService", () => {
     const service = new TelegramService({ bot, token: "unused" });
 
     await expect(service.start()).resolves.toBeUndefined();
+    expect(bot.api.setMyCommands).toHaveBeenCalledTimes(1);
     expect(bot.start).toHaveBeenCalledTimes(1);
 
     resolveStart?.();
@@ -170,6 +188,79 @@ describe("TelegramService", () => {
     expect(enqueueInbound).toHaveBeenCalledTimes(1);
     expect(sendText).not.toHaveBeenCalled();
     expect(pairingService.getOrCreatePendingRequest).not.toHaveBeenCalled();
+  });
+
+  it("resets the current session and skips enqueue for /new", async () => {
+    const bot = new FakeTelegramBot();
+    const enqueueInbound = vi.fn();
+    const resetSession = vi.fn().mockResolvedValue(undefined);
+    const sendText = vi.fn();
+    const pairingService = {
+      isApprovedSender: vi.fn().mockResolvedValue(true),
+      getOrCreatePendingRequest: vi.fn()
+    };
+
+    new TelegramService({ bot, enqueueInbound, pairingService, resetSession, sendText });
+
+    bot.handler?.({
+      update: {
+        message: {
+          from: { id: 7 },
+          chat: { id: 7, type: "private" },
+          text: "/new"
+        }
+      }
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(resetSession).toHaveBeenCalledWith({
+      channel: "telegram",
+      accountId: "default",
+      chatType: "direct",
+      conversationId: "7",
+      senderId: "7",
+      text: "/new"
+    });
+    expect(sendText).toHaveBeenCalledWith(
+      {
+        channel: "telegram",
+        accountId: "default",
+        chatType: "direct",
+        conversationId: "7"
+      },
+      "Started a fresh session. Your next message will use a new Claude session."
+    );
+    expect(enqueueInbound).not.toHaveBeenCalled();
+  });
+
+  it("accepts /new@botname as the new-session command", async () => {
+    const bot = new FakeTelegramBot();
+    const enqueueInbound = vi.fn();
+    const resetSession = vi.fn().mockResolvedValue(undefined);
+    const sendText = vi.fn();
+    const pairingService = {
+      isApprovedSender: vi.fn().mockResolvedValue(true),
+      getOrCreatePendingRequest: vi.fn()
+    };
+
+    new TelegramService({ bot, enqueueInbound, pairingService, resetSession, sendText });
+
+    bot.handler?.({
+      update: {
+        message: {
+          from: { id: 7 },
+          chat: { id: 7, type: "private" },
+          text: "/new@baliclaw_bot"
+        }
+      }
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(resetSession).toHaveBeenCalledTimes(1);
+    expect(enqueueInbound).not.toHaveBeenCalled();
+    expect(sendText).toHaveBeenCalledTimes(1);
   });
 
   it("returns from the handler immediately after queueing work", async () => {

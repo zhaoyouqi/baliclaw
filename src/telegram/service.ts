@@ -14,9 +14,26 @@ export interface TelegramServiceContext {
 }
 
 export interface TelegramPollingBot {
+  api: {
+    setMyCommands(
+      commands: readonly TelegramBotCommand[],
+      other?: TelegramSetMyCommandsOptions
+    ): Promise<true>;
+  };
   on(filter: "message", handler: (context: TelegramServiceContext) => MaybePromise<unknown>): void;
   start(options?: PollingOptions): Promise<void>;
   stop(): Promise<void>;
+}
+
+interface TelegramBotCommand {
+  command: string;
+  description: string;
+}
+
+interface TelegramSetMyCommandsOptions {
+  scope?: {
+    type: "all_private_chats";
+  };
 }
 
 export interface TelegramServiceOptions {
@@ -24,6 +41,7 @@ export interface TelegramServiceOptions {
   bot?: TelegramPollingBot;
   enqueueInbound?: (message: InboundMessage) => MaybePromise<unknown>;
   pairingService?: Pick<PairingService, "getOrCreatePendingRequest" | "isApprovedSender">;
+  resetSession?: (message: InboundMessage) => MaybePromise<unknown>;
   sendText?: (target: DeliveryTarget, text: string) => MaybePromise<unknown>;
   logger?: Logger;
 }
@@ -35,6 +53,7 @@ export class TelegramService {
   private readonly token: string;
   private readonly enqueueInbound: (message: InboundMessage) => MaybePromise<unknown>;
   private readonly pairingService: Pick<PairingService, "getOrCreatePendingRequest" | "isApprovedSender"> | undefined;
+  private readonly resetSession: ((message: InboundMessage) => MaybePromise<unknown>) | undefined;
   private readonly sendText: (target: DeliveryTarget, text: string) => MaybePromise<unknown>;
   private readonly logger: Logger;
   private pollingTask: Promise<void> | null = null;
@@ -45,6 +64,7 @@ export class TelegramService {
     this.token = options.token ?? "";
     this.enqueueInbound = options.enqueueInbound ?? (() => undefined);
     this.pairingService = options.pairingService;
+    this.resetSession = options.resetSession;
     this.sendText = options.sendText ?? (() => undefined);
     this.logger = options.logger ?? getLogger("telegram");
 
@@ -100,6 +120,20 @@ export class TelegramService {
       return;
     }
 
+    if (this.resetSession && isNewSessionCommand(inbound.text)) {
+      await this.resetSession(inbound);
+      await this.sendText(
+        {
+          channel: "telegram",
+          accountId: "default",
+          chatType: "direct",
+          conversationId: inbound.conversationId
+        },
+        "Started a fresh session. Your next message will use a new Claude session."
+      );
+      return;
+    }
+
     await this.enqueueInbound(inbound);
   }
 
@@ -115,6 +149,20 @@ export class TelegramService {
         this.bot = bot;
         this.registerMessageHandler(bot);
       }
+
+      await bot.api.setMyCommands(
+        [
+          {
+            command: "new",
+            description: "Start a fresh session"
+          }
+        ],
+        {
+          scope: {
+            type: "all_private_chats"
+          }
+        }
+      );
 
       this.pollingTask = bot.start({
         onStart: async () => {
@@ -172,4 +220,9 @@ function toTelegramServiceError(error: unknown): Error {
   }
 
   return new Error(`Unknown Telegram error: ${String(error)}`);
+}
+
+function isNewSessionCommand(text: string): boolean {
+  const normalized = text.trim();
+  return /^\/new(?:@[A-Za-z0-9_]+)?$/.test(normalized);
 }

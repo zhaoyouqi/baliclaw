@@ -27,7 +27,7 @@ export interface AgentRunOptions {
 export interface AgentServiceDependencies {
   logger?: Logger;
   runQueryAgent?: typeof queryAgent;
-  sessionMapStore?: Pick<ClaudeSessionMapStore, "get" | "set">;
+  sessionMapStore?: Pick<ClaudeSessionMapStore, "get" | "set" | "delete">;
 }
 
 const genericAgentFailureMessage = "Sorry, I ran into an internal error while processing your request.";
@@ -38,7 +38,7 @@ const permissionDeniedPrefix = "Sorry, Claude Code denied the requested operatio
 export class AgentService {
   private readonly logger: Logger;
   private readonly runQueryAgent: typeof queryAgent;
-  private readonly sessionMapStore: Pick<ClaudeSessionMapStore, "get" | "set">;
+  private readonly sessionMapStore: Pick<ClaudeSessionMapStore, "get" | "set" | "delete">;
 
   constructor(dependencies: AgentServiceDependencies = {}) {
     this.logger = dependencies.logger ?? getLogger("agent");
@@ -118,6 +118,10 @@ export class AgentService {
       );
       return toUserFacingFailureMessage(error);
     }
+  }
+
+  async resetSession(sessionId: string): Promise<void> {
+    await this.sessionMapStore.delete(sessionId);
   }
 }
 

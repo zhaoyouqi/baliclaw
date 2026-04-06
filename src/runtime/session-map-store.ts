@@ -29,4 +29,10 @@ export class ClaudeSessionMapStore {
     data.sessions[businessSessionId] = claudeSessionId;
     await writeJson5File(this.paths.claudeSessionMapFile, data);
   }
+
+  async delete(businessSessionId: string): Promise<void> {
+    const data = await this.load();
+    delete data.sessions[businessSessionId];
+    await writeJson5File(this.paths.claudeSessionMapFile, data);
+  }
 }

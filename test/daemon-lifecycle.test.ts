@@ -17,6 +17,9 @@ interface RegisteredHandler {
 
 class FakeTelegramBot {
   handler: RegisteredHandler | undefined;
+  api = {
+    setMyCommands: vi.fn(async () => true as const)
+  };
   start = vi.fn(async () => undefined);
   stop = vi.fn(async () => undefined);
 
@@ -266,6 +269,80 @@ describe("bootstrap", () => {
         "agent reply"
       );
       expect(typingHeartbeat.stop).toHaveBeenCalledTimes(1);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("routes /new through the session queue, resets the Claude session map, and sends a confirmation", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-bootstrap-reset-"));
+    const paths = getAppPaths(home);
+    const bot = new FakeTelegramBot();
+    const sendText = vi.fn<() => Promise<void>>().mockResolvedValue();
+    const pairingService = {
+      isApprovedSender: vi.fn().mockResolvedValue(true),
+      getOrCreatePendingRequest: vi.fn()
+    } as never;
+    const sessionService = {
+      runTurn: vi.fn(async (message: InboundMessage, handler: (message: InboundMessage, sessionId: string) => Promise<void>) =>
+        handler(message, "telegram:default:direct:42"))
+    } as never;
+    const agentService = {
+      handleMessage: vi.fn(),
+      resetSession: vi.fn().mockResolvedValue(undefined)
+    } as never;
+
+    try {
+      await bootstrap({
+        paths,
+        telegramBot: bot,
+        sendText,
+        createTypingHeartbeat: createNoopTypingHeartbeat,
+        pairingService,
+        sessionService,
+        agentService,
+        ipcServer: {
+          start: vi.fn<() => Promise<void>>().mockResolvedValue(),
+          stop: vi.fn<() => Promise<void>>().mockResolvedValue()
+        } as never,
+        configService: {
+          load: vi.fn<() => Promise<AppConfig>>().mockResolvedValue({
+            ...defaultConfig,
+            channels: {
+              telegram: {
+                enabled: true,
+                botToken: "secret"
+              }
+            }
+          })
+        } as never
+      });
+
+      bot.handler?.({
+        update: {
+          message: {
+            from: { id: 42 },
+            chat: { id: 42, type: "private" },
+            text: "/new"
+          }
+        }
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(pairingService.isApprovedSender).toHaveBeenCalledWith("42");
+      expect(sessionService.runTurn).toHaveBeenCalledTimes(1);
+      expect(agentService.resetSession).toHaveBeenCalledWith("telegram:default:direct:42");
+      expect(agentService.handleMessage).not.toHaveBeenCalled();
+      expect(sendText).toHaveBeenCalledWith(
+        {
+          channel: "telegram",
+          accountId: "default",
+          chatType: "direct",
+          conversationId: "42"
+        },
+        "Started a fresh session. Your next message will use a new Claude session."
+      );
     } finally {
       await rm(home, { recursive: true, force: true });
     }

@@ -22,7 +22,8 @@ describe("AgentService", () => {
     });
     const sessionMapStore = {
       get: vi.fn().mockResolvedValue(undefined),
-      set: vi.fn().mockResolvedValue(undefined)
+      set: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined)
     };
     const service = new AgentService({
       runQueryAgent: queryAgent,
@@ -49,7 +50,8 @@ describe("AgentService", () => {
     });
     const sessionMapStore = {
       get: vi.fn().mockResolvedValue("claude-session-existing"),
-      set: vi.fn().mockResolvedValue(undefined)
+      set: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined)
     };
     const service = new AgentService({
       runQueryAgent: queryAgent,
@@ -110,7 +112,8 @@ describe("AgentService", () => {
       runQueryAgent: vi.fn().mockRejectedValue(new Error("Claude Agent SDK failed: max turns reached")),
       sessionMapStore: {
         get: vi.fn().mockResolvedValue(undefined),
-        set: vi.fn()
+        set: vi.fn(),
+        delete: vi.fn()
       }
     });
 
@@ -128,7 +131,8 @@ describe("AgentService", () => {
       runQueryAgent: vi.fn().mockRejectedValue(new Error("Claude Agent SDK failed: error_max_turns")),
       sessionMapStore: {
         get: vi.fn().mockResolvedValue(undefined),
-        set: vi.fn()
+        set: vi.fn(),
+        delete: vi.fn()
       }
     });
 
@@ -150,7 +154,8 @@ describe("AgentService", () => {
       ),
       sessionMapStore: {
         get: vi.fn().mockResolvedValue(undefined),
-        set: vi.fn()
+        set: vi.fn(),
+        delete: vi.fn()
       }
     });
 
@@ -168,7 +173,8 @@ describe("AgentService", () => {
       runQueryAgent: vi.fn().mockRejectedValue(new Error("network broke")),
       sessionMapStore: {
         get: vi.fn().mockResolvedValue(undefined),
-        set: vi.fn()
+        set: vi.fn(),
+        delete: vi.fn()
       }
     });
 
@@ -176,5 +182,23 @@ describe("AgentService", () => {
       "Sorry, I ran into an internal error while processing your request. Root cause: network broke"
     );
     expect(destination.write).toHaveBeenCalled();
+  });
+
+  it("resets a session by deleting its Claude session mapping without running the agent", async () => {
+    const queryAgent = vi.fn();
+    const sessionMapStore = {
+      get: vi.fn(),
+      set: vi.fn(),
+      delete: vi.fn().mockResolvedValue(undefined)
+    };
+    const service = new AgentService({
+      runQueryAgent: queryAgent,
+      sessionMapStore
+    });
+
+    await expect(service.resetSession("telegram:default:direct:42")).resolves.toBeUndefined();
+
+    expect(sessionMapStore.delete).toHaveBeenCalledWith("telegram:default:direct:42");
+    expect(queryAgent).not.toHaveBeenCalled();
   });
 });

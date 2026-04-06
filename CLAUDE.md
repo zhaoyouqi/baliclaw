@@ -11,6 +11,8 @@ BaliClaw is a local-first AI gateway for Telegram DM workflows. It bridges Teleg
 - GitHub repository: `zhaoyouqi/baliclaw`
 - HTTPS remote: `https://github.com/zhaoyouqi/baliclaw.git`
 - Issues are tracked on GitHub: `https://github.com/zhaoyouqi/baliclaw/issues`
+- npm package: `@zhaoyuanjie/baliclaw`
+- npm registry: `https://registry.npmjs.org/`
 
 ## Commands
 

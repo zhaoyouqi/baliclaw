@@ -5,6 +5,7 @@ import { ensureStateDirectories, getAppPaths, type AppPaths } from "../config/pa
 import type { AppConfig } from "../config/schema.js";
 import { IpcServer } from "../ipc/server.js";
 import { AgentService } from "../runtime/agent-service.js";
+import { buildTelegramDirectSessionId } from "../session/stable-key.js";
 import { SessionService } from "../session/service.js";
 import {
   createTelegramApi,
@@ -120,6 +121,9 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
                 : "Session context was automatically compacted so the conversation could continue.";
               await sendText(deliveryTarget, notice);
             }
+            if (result.todoNotice) {
+              await sendText(deliveryTarget, result.todoNotice);
+            }
           } finally {
             await typingHeartbeat.stop();
           }
@@ -155,6 +159,9 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
             await typingHeartbeat.stop();
           }
         });
+      },
+      getSessionTodo: async (message) => {
+        return agentService.getTodoSummary(buildTelegramDirectSessionId(message));
       },
       sendText
     };

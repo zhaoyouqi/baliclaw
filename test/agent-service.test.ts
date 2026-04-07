@@ -240,6 +240,112 @@ describe("AgentService", () => {
     });
   });
 
+  it("reports key todo changes and stores the latest todo snapshot", async () => {
+    const queryAgent = vi.fn()
+      .mockResolvedValueOnce({
+        text: "done",
+        sessionId: "claude-session-existing",
+        todo: [
+          {
+            content: "Inspect the repo",
+            status: "pending" as const,
+            activeForm: "Inspecting the repo"
+          },
+          {
+            content: "Implement the feature",
+            status: "in_progress" as const,
+            activeForm: "Implementing the feature"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        text: "done again",
+        sessionId: "claude-session-existing",
+        todo: [
+          {
+            content: "Inspect the repo",
+            status: "completed" as const,
+            activeForm: "Inspecting the repo"
+          },
+          {
+            content: "Implement the feature",
+            status: "completed" as const,
+            activeForm: "Implementing the feature"
+          }
+        ]
+      });
+    const sessionMapStore = {
+      get: vi.fn().mockResolvedValue("claude-session-existing"),
+      set: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined)
+    };
+    const sessionContextStore = new SessionContextStore();
+    const service = new AgentService({
+      runQueryAgent: queryAgent,
+      sessionMapStore,
+      sessionContextStore
+    });
+
+    await expect(service.handleMessageWithMetadata(makeMessage("hello"), "/tmp/project")).resolves.toEqual({
+      text: "done",
+      todoNotice: "**Task plan created**\n0/2 completed."
+    });
+    expect(service.getTodoSummary("telegram:default:direct:42")).toBe(
+      "## Task List\n**0/2 completed**\n1. [ ] Inspect the repo\n2. [>] **Implementing the feature**"
+    );
+
+    await expect(service.handleMessageWithMetadata(makeMessage("hello again"), "/tmp/project")).resolves.toEqual({
+      text: "done again",
+      todoNotice: "**Task plan completed**\n2/2 done."
+    });
+    expect(service.getTodoSummary("telegram:default:direct:42")).toBe(
+      "## Task List\n**2/2 completed**\n1. [x] Inspect the repo\n2. [x] Implement the feature"
+    );
+  });
+
+  it("returns a readable message when no todo snapshot exists for the session", () => {
+    const service = new AgentService({
+      sessionContextStore: new SessionContextStore()
+    });
+
+    expect(service.getTodoSummary("telegram:default:direct:42")).toBe(
+      "No task list is available for the current session yet."
+    );
+  });
+
+  it("clears the stored todo snapshot when resetting the session", async () => {
+    const sessionMapStore = {
+      get: vi.fn().mockResolvedValue("claude-session-existing"),
+      set: vi.fn().mockResolvedValue(undefined),
+      delete: vi.fn().mockResolvedValue(undefined)
+    };
+    const sessionContextStore = new SessionContextStore();
+    sessionContextStore.set("telegram:default:direct:42", {
+      compacting: false,
+      todo: {
+        updatedAt: "2026-04-07T00:00:00.000Z",
+        todos: [
+          {
+            content: "Implement the feature",
+            status: "in_progress",
+            activeForm: "Implementing the feature"
+          }
+        ]
+      },
+      updatedAt: "2026-04-07T00:00:00.000Z"
+    });
+    const service = new AgentService({
+      sessionMapStore,
+      sessionContextStore
+    });
+
+    await service.resetSession("telegram:default:direct:42");
+
+    expect(service.getTodoSummary("telegram:default:direct:42")).toBe(
+      "No task list is available for the current session yet."
+    );
+  });
+
   it("compacts the current session on demand when a Claude session already exists", async () => {
     const queryAgent = vi.fn().mockResolvedValue({
       text: "Compacted",

@@ -7,7 +7,8 @@ import { getLogger } from "../shared/logger.js";
 import { queryAgent, type QueryRequest } from "./sdk.js";
 import {
   SessionContextStore,
-  type SessionContextSnapshot
+  type SessionContextSnapshot,
+  type SessionTodoItem
 } from "./session-context-store.js";
 import { ClaudeSessionMapStore } from "./session-map-store.js";
 
@@ -39,6 +40,7 @@ export interface AgentMessageResult {
   text: string;
   autoCompacted?: boolean;
   autoCompactionPreTokens?: number;
+  todoNotice?: string;
 }
 
 const genericAgentFailureMessage = "Sorry, I ran into an internal error while processing your request.";
@@ -77,8 +79,10 @@ export class AgentService {
 
     try {
       const resumeSessionId = await this.sessionMapStore.get(options.sessionId);
+      const previousTodo = this.sessionContextStore.get(options.sessionId)?.todo?.todos;
       const result = await this.runQueryAgent(createQueryRequest(message.text, options, resumeSessionId));
       await this.sessionMapStore.set(options.sessionId, result.sessionId);
+      const todoNotice = this.buildTodoNotice(previousTodo, result.todo);
       this.updateSessionContext(options.sessionId, result);
       return {
         text: result.text,
@@ -87,7 +91,8 @@ export class AgentService {
               autoCompacted: true,
               autoCompactionPreTokens: result.compaction.preTokens
             }
-          : {})
+          : {}),
+        ...(todoNotice ? { todoNotice } : {})
       };
     } catch (error) {
       this.logger.error(
@@ -109,6 +114,20 @@ export class AgentService {
   async resetSession(sessionId: string): Promise<void> {
     await this.sessionMapStore.delete(sessionId);
     this.sessionContextStore.delete(sessionId);
+  }
+
+  getTodoSummary(sessionId: string): string {
+    const todo = this.sessionContextStore.get(sessionId)?.todo;
+    if (!todo || todo.todos.length === 0) {
+      return "No task list is available for the current session yet.";
+    }
+
+    const completedCount = todo.todos.filter((item) => item.status === "completed").length;
+    return [
+      "## Task List",
+      `**${completedCount}/${todo.todos.length} completed**`,
+      ...todo.todos.map((item, index) => `${index + 1}. ${renderTodoStatus(item.status)} ${item.status === "in_progress" ? `**${item.activeForm}**` : item.content}`)
+    ].join("\n");
   }
 
   async compactSession(
@@ -186,8 +205,60 @@ export class AgentService {
       snapshot.lastCompaction = previous.lastCompaction;
     }
 
+    if (result.todo) {
+      snapshot.todo = {
+        todos: result.todo,
+        updatedAt
+      };
+    } else if (previous?.todo) {
+      snapshot.todo = previous.todo;
+    }
+
     this.sessionContextStore.set(sessionId, snapshot);
   }
+
+  private buildTodoNotice(previousTodos: SessionTodoItem[] | undefined, nextTodos: SessionTodoItem[] | undefined): string | undefined {
+    if (!nextTodos || nextTodos.length === 0) {
+      return undefined;
+    }
+
+    const completedCount = nextTodos.filter((todo) => todo.status === "completed").length;
+    const activeTodo = nextTodos.find((todo) => todo.status === "in_progress");
+    const previousActiveTodo = previousTodos?.find((todo) => todo.status === "in_progress");
+    const hadPreviousTodos = Boolean(previousTodos && previousTodos.length > 0);
+    const previousAllCompleted = Boolean(
+      previousTodos &&
+      previousTodos.length > 0 &&
+      previousTodos.every((todo) => todo.status === "completed")
+    );
+    const nextAllCompleted = nextTodos.every((todo) => todo.status === "completed");
+
+    if (!hadPreviousTodos) {
+      return `**Task plan created**\n${completedCount}/${nextTodos.length} completed.`;
+    }
+
+    if (!previousAllCompleted && nextAllCompleted) {
+      return `**Task plan completed**\n${completedCount}/${nextTodos.length} done.`;
+    }
+
+    if (activeTodo && activeTodo.activeForm !== previousActiveTodo?.activeForm) {
+      return `**Now working on:** ${activeTodo.activeForm}`;
+    }
+
+    return undefined;
+  }
+}
+
+function renderTodoStatus(status: SessionTodoItem["status"]): string {
+  if (status === "completed") {
+    return "[x]";
+  }
+
+  if (status === "in_progress") {
+    return "[>]";
+  }
+
+  return "[ ]";
 }
 
 function createQueryRequest(

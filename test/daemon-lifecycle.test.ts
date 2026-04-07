@@ -363,6 +363,93 @@ describe("bootstrap", () => {
     }
   });
 
+  it("sends a todo progress notice before the final reply when a key todo update occurs", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-bootstrap-todo-notice-"));
+    const paths = getAppPaths(home);
+    const bot = new FakeTelegramBot();
+    const sendText = vi.fn<() => Promise<void>>().mockResolvedValue();
+    const pairingService = {
+      isApprovedSender: vi.fn().mockResolvedValue(true),
+      getOrCreatePendingRequest: vi.fn()
+    } as never;
+    const sessionService = {
+      runTurn: vi.fn(async (message: InboundMessage, handler: (message: InboundMessage, sessionId: string) => Promise<void>) =>
+        handler(message, "telegram:default:direct:42"))
+    } as never;
+    const agentService = {
+      handleMessage: vi.fn(),
+      handleMessageWithMetadata: vi.fn().mockResolvedValue({
+        text: "agent reply",
+        todoNotice: "**Task plan created**\n0/2 completed."
+      }),
+      compactSession: vi.fn(),
+      getTodoSummary: vi.fn()
+    } as never;
+    const typingHeartbeat = createNoopTypingHeartbeat();
+
+    try {
+      await bootstrap({
+        paths,
+        telegramBot: bot,
+        sendText,
+        createTypingHeartbeat: () => typingHeartbeat,
+        pairingService,
+        sessionService,
+        agentService,
+        ipcServer: {
+          start: vi.fn<() => Promise<void>>().mockResolvedValue(),
+          stop: vi.fn<() => Promise<void>>().mockResolvedValue()
+        } as never,
+        configService: {
+          load: vi.fn<() => Promise<AppConfig>>().mockResolvedValue({
+            ...defaultConfig,
+            channels: {
+              telegram: {
+                enabled: true,
+                botToken: "secret"
+              }
+            }
+          })
+        } as never
+      });
+
+      bot.handler?.({
+        update: {
+          message: {
+            from: { id: 42 },
+            chat: { id: 42, type: "private" },
+            text: "hello"
+          }
+        }
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(sendText).toHaveBeenNthCalledWith(
+        1,
+        {
+          channel: "telegram",
+          accountId: "default",
+          chatType: "direct",
+          conversationId: "42"
+        },
+        "**Task plan created**\n0/2 completed."
+      );
+      expect(sendText).toHaveBeenNthCalledWith(
+        2,
+        {
+          channel: "telegram",
+          accountId: "default",
+          chatType: "direct",
+          conversationId: "42"
+        },
+        "agent reply"
+      );
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
   it("routes /new through the session queue, resets the Claude session map, and sends a confirmation", async () => {
     const home = await mkdtemp(join(tmpdir(), "baliclaw-bootstrap-reset-"));
     const paths = getAppPaths(home);
@@ -530,6 +617,81 @@ describe("bootstrap", () => {
         "Compacted the current session."
       );
       expect(typingHeartbeat.stop).toHaveBeenCalledTimes(1);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("routes /todo directly to the session todo summary and sends the result", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-bootstrap-todo-"));
+    const paths = getAppPaths(home);
+    const bot = new FakeTelegramBot();
+    const sendText = vi.fn<() => Promise<void>>().mockResolvedValue();
+    const pairingService = {
+      isApprovedSender: vi.fn().mockResolvedValue(true),
+      getOrCreatePendingRequest: vi.fn()
+    } as never;
+    const sessionService = {
+      runTurn: vi.fn()
+    } as never;
+    const agentService = {
+      handleMessage: vi.fn(),
+      handleMessageWithMetadata: vi.fn(),
+      resetSession: vi.fn(),
+      compactSession: vi.fn(),
+      getTodoSummary: vi.fn().mockReturnValue("## Task List\n**1/2 completed**")
+    } as never;
+
+    try {
+      await bootstrap({
+        paths,
+        telegramBot: bot,
+        sendText,
+        createTypingHeartbeat: createNoopTypingHeartbeat,
+        pairingService,
+        sessionService,
+        agentService,
+        ipcServer: {
+          start: vi.fn<() => Promise<void>>().mockResolvedValue(),
+          stop: vi.fn<() => Promise<void>>().mockResolvedValue()
+        } as never,
+        configService: {
+          load: vi.fn<() => Promise<AppConfig>>().mockResolvedValue({
+            ...defaultConfig,
+            channels: {
+              telegram: {
+                enabled: true,
+                botToken: "secret"
+              }
+            }
+          })
+        } as never
+      });
+
+      bot.handler?.({
+        update: {
+          message: {
+            from: { id: 42 },
+            chat: { id: 42, type: "private" },
+            text: "/todo"
+          }
+        }
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(sessionService.runTurn).not.toHaveBeenCalled();
+      expect(agentService.handleMessageWithMetadata).not.toHaveBeenCalled();
+      expect(agentService.getTodoSummary).toHaveBeenCalledWith("telegram:default:direct:42");
+      expect(sendText).toHaveBeenCalledWith(
+        {
+          channel: "telegram",
+          accountId: "default",
+          chatType: "direct",
+          conversationId: "42"
+        },
+        "## Task List\n**1/2 completed**"
+      );
     } finally {
       await rm(home, { recursive: true, force: true });
     }

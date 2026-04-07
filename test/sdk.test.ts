@@ -254,6 +254,94 @@ describe("queryAgent", () => {
     expect(query.mock.calls[0]?.[0].options).not.toHaveProperty("settingSources");
   });
 
+  it("extracts TodoWrite updates from assistant tool-use blocks", async () => {
+    const query = vi.fn(async function* () {
+      yield {
+        type: "assistant" as const,
+        message: {
+          content: [
+            {
+              type: "tool_use" as const,
+              name: "TodoWrite",
+              input: {
+                todos: [
+                  {
+                    content: "Inspect the repository",
+                    status: "completed" as const,
+                    activeForm: "Inspecting the repository"
+                  },
+                  {
+                    content: "Implement the feature",
+                    status: "in_progress" as const,
+                    activeForm: "Implementing the feature"
+                  }
+                ]
+              }
+            }
+          ]
+        } as never,
+        parent_tool_use_id: null,
+        uuid: "assistant-uuid",
+        session_id: "session"
+      };
+      yield {
+        type: "result" as const,
+        subtype: "success" as const,
+        duration_ms: 1,
+        duration_api_ms: 1,
+        is_error: false,
+        num_turns: 1,
+        result: "ok",
+        stop_reason: null,
+        total_cost_usd: 0,
+        usage: {
+          input_tokens: 100
+        } as never,
+        modelUsage: {},
+        permission_denials: [],
+        uuid: "uuid",
+        session_id: "session"
+      };
+    });
+
+    await expect(
+      queryAgent(
+        {
+          prompt: "hello",
+          sessionId: "telegram:default:direct:42",
+          cwd: "/tmp/project"
+        },
+        {
+          buildSystemPrompt: vi.fn().mockResolvedValue("prompt"),
+          buildAgentDefinitions: vi.fn().mockResolvedValue(undefined),
+          loadPromptOnlySkills: vi.fn().mockResolvedValue([]),
+          query: query as never
+        }
+      )
+    ).resolves.toEqual({
+      text: "ok",
+      sessionId: "session",
+      usage: {
+        totalCostUsd: 0,
+        turns: 1,
+        estimatedInputTokens: 100
+      },
+      compacting: false,
+      todo: [
+        {
+          content: "Inspect the repository",
+          status: "completed",
+          activeForm: "Inspecting the repository"
+        },
+        {
+          content: "Implement the feature",
+          status: "in_progress",
+          activeForm: "Implementing the feature"
+        }
+      ]
+    });
+  });
+
   it("uses resume instead of opening a new Claude session when a previous Claude session id exists", async () => {
     const query = vi.fn(async function* () {
       yield {

@@ -4,10 +4,22 @@ export interface SessionCompactionInfo {
   compactedAt: string;
 }
 
+export interface SessionTodoItem {
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+  activeForm: string;
+}
+
+export interface SessionTodoSnapshot {
+  todos: SessionTodoItem[];
+  updatedAt: string;
+}
+
 export interface SessionContextSnapshot {
   estimatedInputTokens?: number;
   compacting: boolean;
   lastCompaction?: SessionCompactionInfo;
+  todo?: SessionTodoSnapshot;
   updatedAt: string;
 }
 

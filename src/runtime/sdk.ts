@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import {
   query as sdkQuery,
   type AgentDefinition as SdkAgentDefinition,
+  type SDKAssistantMessage,
   type SDKCompactBoundaryMessage,
   type SDKMessage,
   type SDKResultError,
@@ -47,12 +48,19 @@ export interface QueryCompaction {
   preTokens: number;
 }
 
+export interface QueryTodoItem {
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+  activeForm: string;
+}
+
 export interface QueryResult {
   text: string;
   sessionId: string;
   usage?: QueryUsage;
   compacting?: boolean;
   compaction?: QueryCompaction;
+  todo?: QueryTodoItem[];
 }
 
 export interface QueryAgentDependencies {
@@ -183,6 +191,10 @@ function isSdkStatusMessage(message: SDKMessage): message is SDKStatusMessage {
   return message.type === "system" && message.subtype === "status";
 }
 
+function isSdkAssistantMessage(message: SDKMessage): message is SDKAssistantMessage {
+  return message.type === "assistant";
+}
+
 function isSdkCompactBoundaryMessage(message: SDKMessage): message is SDKCompactBoundaryMessage {
   return message.type === "system" && message.subtype === "compact_boundary";
 }
@@ -271,10 +283,18 @@ async function executeSdkQuery(
     let finalResult: SDKResultSuccess | SDKResultError | null = null;
     let compacting = false;
     let compaction: QueryCompaction | undefined;
+    let todo: QueryTodoItem[] | undefined;
 
     for await (const message of stream) {
       if (isSdkStatusMessage(message) && message.status === "compacting") {
         compacting = true;
+      }
+
+      if (isSdkAssistantMessage(message)) {
+        const nextTodo = extractTodoWriteItems(message);
+        if (nextTodo) {
+          todo = nextTodo;
+        }
       }
 
       if (isSdkCompactBoundaryMessage(message)) {
@@ -314,11 +334,60 @@ async function executeSdkQuery(
       sessionId: finalResult.session_id,
       usage,
       compacting,
-      ...(compaction ? { compaction } : {})
+      ...(compaction ? { compaction } : {}),
+      ...(todo ? { todo } : {})
     };
   } catch (error) {
     throw withStderrContext(error, stderrOutput());
   }
+}
+
+function extractTodoWriteItems(message: SDKAssistantMessage): QueryTodoItem[] | undefined {
+  const content = Reflect.get(message.message, "content");
+  if (!Array.isArray(content)) {
+    return undefined;
+  }
+
+  for (const block of content) {
+    if (typeof block !== "object" || block === null) {
+      continue;
+    }
+
+    if (Reflect.get(block, "type") !== "tool_use" || Reflect.get(block, "name") !== "TodoWrite") {
+      continue;
+    }
+
+    const input = Reflect.get(block, "input");
+    if (typeof input !== "object" || input === null) {
+      continue;
+    }
+
+    const todos = Reflect.get(input, "todos");
+    if (!Array.isArray(todos)) {
+      continue;
+    }
+
+    return todos.flatMap((todo): QueryTodoItem[] => {
+      if (typeof todo !== "object" || todo === null) {
+        return [];
+      }
+
+      const content = Reflect.get(todo, "content");
+      const status = Reflect.get(todo, "status");
+      const activeForm = Reflect.get(todo, "activeForm");
+      if (
+        typeof content !== "string" ||
+        (status !== "pending" && status !== "in_progress" && status !== "completed") ||
+        typeof activeForm !== "string"
+      ) {
+        return [];
+      }
+
+      return [{ content, status, activeForm }];
+    });
+  }
+
+  return undefined;
 }
 
 function estimateInputTokens(usage: unknown): number | undefined {

@@ -41,6 +41,10 @@ describe("TelegramService", () => {
         {
           command: "new",
           description: "Start a fresh session"
+        },
+        {
+          command: "todo",
+          description: "Show the current task list"
         }
       ],
       {
@@ -338,6 +342,87 @@ describe("TelegramService", () => {
     expect(compactSession).toHaveBeenCalledTimes(1);
     expect(enqueueInbound).not.toHaveBeenCalled();
     expect(sendText).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns the current todo snapshot and skips enqueue for /todo", async () => {
+    const bot = new FakeTelegramBot();
+    const enqueueInbound = vi.fn();
+    const getSessionTodo = vi.fn().mockResolvedValue("## Task List\n**1/2 completed**");
+    const sendText = vi.fn();
+    const pairingService = {
+      isApprovedSender: vi.fn().mockResolvedValue(true),
+      getOrCreatePendingRequest: vi.fn()
+    };
+
+    new TelegramService({ bot, enqueueInbound, pairingService, getSessionTodo, sendText });
+
+    bot.handler?.({
+      update: {
+        message: {
+          from: { id: 7 },
+          chat: { id: 7, type: "private" },
+          text: "/todo"
+        }
+      }
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getSessionTodo).toHaveBeenCalledWith({
+      channel: "telegram",
+      accountId: "default",
+      chatType: "direct",
+      conversationId: "7",
+      senderId: "7",
+      text: "/todo"
+    });
+    expect(sendText).toHaveBeenCalledWith(
+      {
+        channel: "telegram",
+        accountId: "default",
+        chatType: "direct",
+        conversationId: "7"
+      },
+      "## Task List\n**1/2 completed**"
+    );
+    expect(enqueueInbound).not.toHaveBeenCalled();
+  });
+
+  it("accepts /todo@botname as the todo command", async () => {
+    const bot = new FakeTelegramBot();
+    const enqueueInbound = vi.fn();
+    const getSessionTodo = vi.fn().mockResolvedValue(undefined);
+    const sendText = vi.fn();
+    const pairingService = {
+      isApprovedSender: vi.fn().mockResolvedValue(true),
+      getOrCreatePendingRequest: vi.fn()
+    };
+
+    new TelegramService({ bot, enqueueInbound, pairingService, getSessionTodo, sendText });
+
+    bot.handler?.({
+      update: {
+        message: {
+          from: { id: 7 },
+          chat: { id: 7, type: "private" },
+          text: "/todo@baliclaw_bot"
+        }
+      }
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getSessionTodo).toHaveBeenCalledTimes(1);
+    expect(sendText).toHaveBeenCalledWith(
+      {
+        channel: "telegram",
+        accountId: "default",
+        chatType: "direct",
+        conversationId: "7"
+      },
+      "No task list is available for the current session yet."
+    );
+    expect(enqueueInbound).not.toHaveBeenCalled();
   });
 
   it("returns from the handler immediately after queueing work", async () => {

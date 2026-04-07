@@ -43,6 +43,7 @@ export interface TelegramServiceOptions {
   pairingService?: Pick<PairingService, "getOrCreatePendingRequest" | "isApprovedSender">;
   resetSession?: (message: InboundMessage) => MaybePromise<string | undefined>;
   compactSession?: (message: InboundMessage) => MaybePromise<string | undefined>;
+  getSessionTodo?: (message: InboundMessage) => MaybePromise<string | undefined>;
   sendText?: (target: DeliveryTarget, text: string) => MaybePromise<unknown>;
   logger?: Logger;
 }
@@ -56,6 +57,7 @@ export class TelegramService {
   private readonly pairingService: Pick<PairingService, "getOrCreatePendingRequest" | "isApprovedSender"> | undefined;
   private readonly resetSession: ((message: InboundMessage) => MaybePromise<string | undefined>) | undefined;
   private readonly compactSession: ((message: InboundMessage) => MaybePromise<string | undefined>) | undefined;
+  private readonly getSessionTodo: ((message: InboundMessage) => MaybePromise<string | undefined>) | undefined;
   private readonly sendText: (target: DeliveryTarget, text: string) => MaybePromise<unknown>;
   private readonly logger: Logger;
   private pollingTask: Promise<void> | null = null;
@@ -68,6 +70,7 @@ export class TelegramService {
     this.pairingService = options.pairingService;
     this.resetSession = options.resetSession;
     this.compactSession = options.compactSession;
+    this.getSessionTodo = options.getSessionTodo;
     this.sendText = options.sendText ?? (() => undefined);
     this.logger = options.logger ?? getLogger("telegram");
 
@@ -151,6 +154,20 @@ export class TelegramService {
       return;
     }
 
+    if (this.getSessionTodo && isTodoSessionCommand(inbound.text)) {
+      const reply = await this.getSessionTodo(inbound);
+      await this.sendText(
+        {
+          channel: "telegram",
+          accountId: "default",
+          chatType: "direct",
+          conversationId: inbound.conversationId
+        },
+        reply ?? "No task list is available for the current session yet."
+      );
+      return;
+    }
+
     await this.enqueueInbound(inbound);
   }
 
@@ -176,6 +193,10 @@ export class TelegramService {
           {
             command: "new",
             description: "Start a fresh session"
+          },
+          {
+            command: "todo",
+            description: "Show the current task list"
           }
         ],
         {
@@ -251,4 +272,9 @@ function isNewSessionCommand(text: string): boolean {
 function isCompactSessionCommand(text: string): boolean {
   const normalized = text.trim();
   return /^\/compact(?:@[A-Za-z0-9_]+)?$/.test(normalized);
+}
+
+function isTodoSessionCommand(text: string): boolean {
+  const normalized = text.trim();
+  return /^\/todo(?:@[A-Za-z0-9_]+)?$/.test(normalized);
 }

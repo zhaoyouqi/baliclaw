@@ -98,7 +98,7 @@ describe("appConfigSchema Phase 2", () => {
     });
     expect(config.runtime.loadFilesystemSettings).toBe(true);
     expect(config.scheduledTasks).toEqual({
-      enabled: false,
+      enabled: true,
       file: ""
     });
   });
@@ -121,7 +121,7 @@ describe("appConfigSchema Phase 2", () => {
     expect(config.runtime.soulFile).toBeUndefined();
     expect(config.runtime.userFile).toBeUndefined();
     expect(config.scheduledTasks).toEqual({
-      enabled: false,
+      enabled: true,
       file: ""
     });
   });

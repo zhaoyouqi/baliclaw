@@ -80,7 +80,7 @@ const loggingConfigSchema = z.object({
 }).strict();
 
 const scheduledTasksConfigSchema = z.object({
-  enabled: z.boolean().default(false),
+  enabled: z.boolean().default(true),
   file: z.string().default("")
 }).strict();
 

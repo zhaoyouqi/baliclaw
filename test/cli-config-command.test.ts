@@ -83,7 +83,7 @@ describe("CLI config commands", () => {
         level: "warn"
       },
       scheduledTasks: {
-        enabled: false,
+        enabled: true,
         file: ""
       },
       mcp: {
@@ -137,7 +137,7 @@ describe("CLI config commands", () => {
           level: "debug"
         },
         scheduledTasks: {
-          enabled: false,
+          enabled: true,
           file: ""
         },
         mcp: {

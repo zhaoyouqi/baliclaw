@@ -29,7 +29,7 @@ describe("ConfigService", () => {
         level: "info"
       });
       expect(config.scheduledTasks).toEqual({
-        enabled: false,
+        enabled: true,
         file: join(home, ".baliclaw", "scheduled-tasks.json5")
       });
       await expect(readFile(join(home, ".baliclaw", "workspace", "AGENTS.md"), "utf8")).resolves.toContain("BaliClaw Workspace Rules");

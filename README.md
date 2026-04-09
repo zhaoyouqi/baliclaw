@@ -1,6 +1,6 @@
 # BaliClaw
 
-BaliClaw is yet another Claw built on Claude Agent SDK. Telegram and WeChat are supported channel adapters, and the daemon/runtime path is channel-agnostic with adapters plus a shared inbound router.
+BaliClaw is yet another Claw built on Claude Agent SDK. Telegram, WeChat, and Lark are supported channel adapters, and the daemon/runtime path is channel-agnostic with adapters plus a shared inbound router.
 
 ## Quick Start
 
@@ -55,7 +55,7 @@ Current core capabilities:
 
 - a local daemon process
 - a CLI that talks to the daemon over a Unix socket
-- channel adapter intake for Telegram and WeChat
+- channel adapter intake for Telegram, WeChat, and Lark
 - channel-aware pairing / allowlist approval
 - Claude Agent SDK execution with stable session IDs
 - reply delivery back through the active adapter
@@ -77,6 +77,7 @@ The current codebase implements:
 - channel adapter bootstrap and shared inbound routing
 - Telegram polling and DM normalization
 - WeChat iLink login, polling, and direct-message normalization
+- Lark app-registration / existing-app login and direct-message normalization
 - pairing request creation and approval
 - stable per-user session routing
 - Claude Agent SDK integration
@@ -159,6 +160,7 @@ node dist/cli/index.js status
 node dist/cli/index.js config get
 node dist/cli/index.js config set --path channels.telegram.botToken '<TOKEN>'
 node dist/cli/index.js channels login --channel wechat --verbose
+node dist/cli/index.js channels login --channel lark --mode new --domain lark
 node dist/cli/index.js pairing list telegram
 node dist/cli/index.js pairing approve telegram <CODE>
 node dist/cli/index.js tui
@@ -174,7 +176,10 @@ Current CLI command groups:
 - `pairing approve telegram <CODE>`
 - `pairing list wechat`
 - `pairing approve wechat <CODE>`
+- `pairing list lark`
+- `pairing approve lark <CODE>`
 - `channels login --channel wechat [--verbose] [--timeoutMs <ms>]`
+- `channels login --channel lark --mode new|existing [--domain feishu|lark] [--app-id <id>] [--app-secret <secret>] [--verbose] [--timeoutMs <ms>]`
 - `scheduled-tasks list`
 - `scheduled-tasks status <taskId>`
 - `scheduled-tasks create <taskId> '<task-json5>'`
@@ -204,6 +209,13 @@ Current config shape:
       enabled: false,
       apiBaseUrl: "https://ilinkai.weixin.qq.com",
       botType: "3"
+    },
+    lark: {
+      enabled: false,
+      appId: "",
+      appSecret: "",
+      domain: "feishu",
+      connectionMode: "websocket"
     }
   },
   runtime: {
@@ -233,8 +245,11 @@ Notes:
 
 - `channels.telegram.botToken` is required when `channels.telegram.enabled` is `true`
 - `channels.wechat` uses daemon-managed state for login credentials; do not put WeChat bot token in config
+- `channels.lark.appId` and `channels.lark.appSecret` are required when `channels.lark.enabled` is `true`
 - `baliclaw channels login --channel wechat` persists login state and auto-enables `channels.wechat.enabled` on success
+- `baliclaw channels login --channel lark --mode new|existing` persists credentials and auto-enables `channels.lark.enabled` on success
 - when WeChat login returns a `userId`, that scanned principal is auto-approved for `wechat/default`; other WeChat users still require pairing approval
+- when Lark `new` login returns an `open_id`, that scanned principal is auto-approved for `lark/default`; other Lark users still require pairing approval
 - `runtime.workingDirectory` defaults to the daemon process working directory
 - config writes go through daemon IPC, not direct CLI file writes
 - config updates are hot-reloaded by the daemon
@@ -255,6 +270,13 @@ WeChat pairing state is stored locally in:
 ```text
 ~/.baliclaw/pairing/wechat/default-pending.json
 ~/.baliclaw/pairing/wechat/default-allowlist.json
+```
+
+Lark pairing state is stored locally in:
+
+```text
+~/.baliclaw/pairing/lark/default-pending.json
+~/.baliclaw/pairing/lark/default-allowlist.json
 ```
 
 Claude session continuity is stored in:
@@ -286,13 +308,13 @@ Scheduled tasks now target a generic delivery object instead of Telegram-specifi
 
 ## Session Isolation
 
-Session continuity is isolated by `channel + accountId + chat type + principal/conversation` (for direct chats, `senderId` is used). This means Telegram and WeChat conversations always run in separate sessions even for the same human user.
+Session continuity is isolated by `channel + accountId + chat type + principal/conversation` (for direct chats, `senderId` is used). This means Telegram, WeChat, and Lark conversations always run in separate sessions even for the same human user.
 
 ## Development Notes
 
 - Use `pnpm` only.
 - Keep filesystem paths centralized in `src/config/paths.ts`.
-- Keep shared channel routing in `src/channel/`, adapter-specific logic in `src/telegram/`, and IPC logic in `src/ipc/`.
+- Keep shared channel routing and adapter-specific logic in `src/channel/`, with per-channel implementations under `src/channel/telegram/`, `src/channel/wechat/`, and `src/channel/lark/`.
 - Keep runtime and prompt behavior in `src/runtime/` and `src/session/`.
 
 ## License

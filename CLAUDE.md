@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BaliClaw is yet another Claw built on Claude Agent SDK. The current product surface supports Telegram and WeChat channel adapters, with daemon/runtime structured around adapters plus a shared inbound router. It bridges channel messages with Anthropic's Claude Agent SDK, running as a local daemon (`baliclawd`) with CLI control (`baliclaw`). Node.js 22+, TypeScript, ESM, pnpm only.
+BaliClaw is yet another Claw built on Claude Agent SDK. The current product surface supports Telegram, WeChat, and Lark channel adapters, with daemon/runtime structured around adapters plus a shared inbound router. It bridges channel messages with Anthropic's Claude Agent SDK, running as a local daemon (`baliclawd`) with CLI control (`baliclaw`). Node.js 22+, TypeScript, ESM, pnpm only.
 
 ## Repository Info
 
@@ -37,7 +37,7 @@ Two processes: a long-lived **daemon** holding all state and connections, and a 
 ### Message Flow
 
 ```
-Channel Adapter (Telegram / WeChat)
+Channel Adapter (Telegram / WeChat / Lark)
   → InboundEnvelope
   → InboundRouter
     → PairingService (per-channel principal check, when supported)
@@ -64,17 +64,18 @@ User asks BaliClaw to create/update a scheduled task
 ### Key Modules
 
 - **`src/daemon/bootstrap.ts`** — Service composition and wiring. The central place where all services are created and connected.
-- **`src/channel/`** — Channel adapter interfaces and the shared inbound router that handles pairing, slash commands, session routing, typing heartbeats, and final reply delivery.
+- **`src/channel/`** — Channel adapter interfaces, shared router/login control plane, and per-channel adapter implementations under `telegram/`, `wechat/`, and `lark/`.
 - **`src/daemon/scheduled-task-service.ts`** — Scheduler lifecycle, next-run timers, non-overlap enforcement, and task run orchestration.
 - **`src/daemon/scheduled-task-manager.ts`** — Daemon-native CRUD layer for scheduled task definitions and status lookups.
 - **`src/config/`** — Zod-validated JSON5 config (`~/.baliclaw/baliclaw.json5`). All filesystem paths centralized in `paths.ts`.
 - **`src/config/scheduled-task-config.ts`** — External scheduled task file schema and load/save service. Scheduled tasks now target a generic `delivery` object instead of Telegram-specific fields.
 - **`src/ipc/`** — HTTP-over-Unix-socket control plane. All config/pairing mutations go through daemon IPC, never direct file writes from CLI.
 - **`src/ipc/handlers/scheduled-tasks.ts`** — IPC handlers for scheduled task list/create/update/delete/status operations.
-- **`src/telegram/`** — Telegram adapter implementation: grammy-based polling, message normalization, reply delivery, typing heartbeat, and Telegram-specific formatting/chunking.
-- **`src/wechat/`** — WeChat adapter implementation: iLink QR login lifecycle, polling, message normalization, reply delivery, typing heartbeat, and state persistence.
-- **`src/channel/control.ts`** — Channel login control plane (`channels login`), including WeChat QR start/wait flow and login-state persistence.
-- **`src/auth/`** — Pairing workflow: unapproved principals get an 8-char code, operator approves via CLI, principal added to the per-channel allowlist. WeChat login can auto-approve the scanned principal when `userId` is available from login confirmation.
+- **`src/channel/telegram/`** — Telegram adapter implementation: grammy-based polling, message normalization, reply delivery, typing heartbeat, and Telegram-specific formatting/chunking.
+- **`src/channel/wechat/`** — WeChat adapter implementation: iLink QR login lifecycle, polling, message normalization, reply delivery, typing heartbeat, and state persistence.
+- **`src/channel/lark/`** — Lark adapter implementation: app-registration login flow, WebSocket event handling, message normalization, and text reply delivery.
+- **`src/channel/control.ts`** — Channel login control plane (`channels login`), including WeChat QR start/wait flow and Lark `new|existing` login-state persistence.
+- **`src/auth/`** — Pairing workflow: unapproved principals get an 8-char code, operator approves via CLI, principal added to the per-channel allowlist. WeChat login can auto-approve the scanned principal when `userId` is available from login confirmation; Lark `new` login can auto-approve the returned `open_id`.
 - **`src/session/`** — Session key derivation and per-session turn queue for serialized processing.
 - **`src/runtime/sdk.ts`** — Claude Agent SDK integration. Builds SDK query options, injects prompt context, manages session continuity via `resumeSessionId`, and passes through MCP/Skills/SubAgents.
 - **`src/runtime/agent-service.ts`** — Runtime request assembly from daemon options into `queryAgent()`, plus user-facing error handling.
@@ -92,7 +93,7 @@ Config, scheduled task definitions/status, Unix socket, per-channel pairing pend
 
 - **pnpm only** — never use npm or bun
 - 2-space indent, camelCase vars/functions, PascalCase types, kebab-case filenames
-- Module boundaries match spec: channel adapters in `src/channel/` and `src/telegram/`, IPC in `src/ipc/`, runtime/prompt in `src/runtime/` and `src/session/`
+- Module boundaries match spec: channel abstractions and adapter implementations live under `src/channel/`, IPC in `src/ipc/`, runtime/prompt in `src/runtime/` and `src/session/`
 - Extend existing service seams rather than cross-module shortcuts
 - Never use `process.chdir()` in daemon
 - Proxy config stays at the Telegram transport boundary; don't leak proxy env vars to Claude child processes
@@ -100,7 +101,7 @@ Config, scheduled task definitions/status, Unix socket, per-channel pairing pend
 - Config mutations always go through daemon IPC; CLI never writes config/pairing files directly
 - Scheduled task mutations also go through daemon IPC / scheduled task manager; do not edit the scheduled task file directly from agent logic
 - Scheduled task runs use fresh Claude sessions; they are independent agent executions, not continuations of the current chat session
-- Session continuity is channel-aware; Telegram and WeChat messages always resolve to different session keys
+- Session continuity is channel-aware; Telegram, WeChat, and Lark messages always resolve to different session keys
 - Scheduled task schedule times are stored and executed in the daemon machine's local timezone
 - BaliClaw is not released yet; do not preserve backward compatibility for superseded local config/state file shapes unless the task explicitly asks for a migration path
 - Prompt files are file-system driven: `SOUL.md` and `USER.md` live in the working directory unless overridden; `MEMORY.md` lives under `~/.baliclaw/memory/projects/`

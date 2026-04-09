@@ -32,6 +32,8 @@ export function getAppPaths(home = homedir()): AppPaths {
   const memoryGlobalDir = join(memoryDir, "global");
   const memoryProjectsDir = join(memoryDir, "projects");
   const logsDir = join(rootDir, "logs");
+  const pendingPairingFile = buildPairingPendingFile(pairingDir, "telegram", "default");
+  const allowlistFile = buildPairingAllowlistFile(pairingDir, "telegram", "default");
 
   return {
     rootDir,
@@ -47,8 +49,8 @@ export function getAppPaths(home = homedir()): AppPaths {
     memoryGlobalDir,
     memoryProjectsDir,
     claudeSessionMapFile: join(sessionDir, "claude-sessions.json"),
-    pendingPairingFile: join(pairingDir, "telegram-pending.json"),
-    allowlistFile: join(pairingDir, "telegram-allowlist.json"),
+    pendingPairingFile,
+    allowlistFile,
     logsDir,
     logFile: join(logsDir, "daemon.log")
   };
@@ -65,4 +67,26 @@ export async function ensureStateDirectories(paths: AppPaths = getAppPaths()): P
     mkdir(paths.memoryProjectsDir, { recursive: true }),
     mkdir(paths.logsDir, { recursive: true })
   ]);
+}
+
+export function getPendingPairingFile(paths: AppPaths, channel: string, accountId: string): string {
+  return buildPairingPendingFile(paths.pairingDir, channel, accountId);
+}
+
+export function getAllowlistPairingFile(paths: AppPaths, channel: string, accountId: string): string {
+  return buildPairingAllowlistFile(paths.pairingDir, channel, accountId);
+}
+
+function buildPairingPendingFile(pairingDir: string, channel: string, accountId: string): string {
+  return join(pairingDir, sanitizePairingPathSegment(channel), `${sanitizePairingPathSegment(accountId)}-pending.json`);
+}
+
+function buildPairingAllowlistFile(pairingDir: string, channel: string, accountId: string): string {
+  return join(pairingDir, sanitizePairingPathSegment(channel), `${sanitizePairingPathSegment(accountId)}-allowlist.json`);
+}
+
+function sanitizePairingPathSegment(value: string | undefined): string {
+  const trimmed = value?.trim() ?? "";
+  const sanitized = trimmed.replace(/[^A-Za-z0-9._-]+/g, "_");
+  return sanitized.length > 0 ? sanitized : "default";
 }

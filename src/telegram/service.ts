@@ -1,13 +1,21 @@
 import { Bot, GrammyError, HttpError, type PollingOptions } from "grammy";
 import type { Logger } from "pino";
-import type { PairingService } from "../auth/pairing-service.js";
+import type { ChannelAdapter } from "../channel/adapter.js";
 import { getLogger } from "../shared/logger.js";
-import type { DeliveryTarget, InboundMessage } from "../shared/types.js";
+import type { DeliveryTarget, InboundEnvelope } from "../shared/types.js";
+import {
+  createTelegramApi,
+  createTelegramTypingHeartbeat,
+  sendTelegramText,
+  type TelegramTypingHeartbeat
+} from "./send.js";
 import { createTelegramClientOptions } from "./proxy.js";
 import {
   normalizeTelegramUpdate,
   type TelegramUpdate
 } from "./normalize.js";
+
+type MaybePromise<T> = T | Promise<T>;
 
 export interface TelegramServiceContext {
   update: TelegramUpdate;
@@ -39,26 +47,21 @@ interface TelegramSetMyCommandsOptions {
 export interface TelegramServiceOptions {
   token?: string;
   bot?: TelegramPollingBot;
-  enqueueInbound?: (message: InboundMessage) => MaybePromise<unknown>;
-  pairingService?: Pick<PairingService, "getOrCreatePendingRequest" | "isApprovedSender">;
-  resetSession?: (message: InboundMessage) => MaybePromise<string | undefined>;
-  compactSession?: (message: InboundMessage) => MaybePromise<string | undefined>;
-  getSessionTodo?: (message: InboundMessage) => MaybePromise<string | undefined>;
+  onInbound?: (envelope: InboundEnvelope) => MaybePromise<unknown>;
   sendText?: (target: DeliveryTarget, text: string) => MaybePromise<unknown>;
+  createTypingHeartbeat?: (target: DeliveryTarget) => TelegramTypingHeartbeat | Promise<TelegramTypingHeartbeat>;
   logger?: Logger;
 }
 
-type MaybePromise<T> = T | Promise<T>;
+export class TelegramService implements ChannelAdapter {
+  readonly channelId = "telegram";
+  readonly supportsPairing = true;
 
-export class TelegramService {
   private bot: TelegramPollingBot | undefined;
   private readonly token: string;
-  private readonly enqueueInbound: (message: InboundMessage) => MaybePromise<unknown>;
-  private readonly pairingService: Pick<PairingService, "getOrCreatePendingRequest" | "isApprovedSender"> | undefined;
-  private readonly resetSession: ((message: InboundMessage) => MaybePromise<string | undefined>) | undefined;
-  private readonly compactSession: ((message: InboundMessage) => MaybePromise<string | undefined>) | undefined;
-  private readonly getSessionTodo: ((message: InboundMessage) => MaybePromise<string | undefined>) | undefined;
-  private readonly sendText: (target: DeliveryTarget, text: string) => MaybePromise<unknown>;
+  private inboundHandler: (envelope: InboundEnvelope) => MaybePromise<unknown>;
+  private readonly sendTextImpl: (target: DeliveryTarget, text: string) => MaybePromise<unknown>;
+  private readonly createTypingHeartbeatImpl: (target: DeliveryTarget) => TelegramTypingHeartbeat | Promise<TelegramTypingHeartbeat>;
   private readonly logger: Logger;
   private pollingTask: Promise<void> | null = null;
   private started = false;
@@ -66,109 +69,60 @@ export class TelegramService {
   constructor(options: TelegramServiceOptions = {}) {
     this.bot = options.bot;
     this.token = options.token ?? "";
-    this.enqueueInbound = options.enqueueInbound ?? (() => undefined);
-    this.pairingService = options.pairingService;
-    this.resetSession = options.resetSession;
-    this.compactSession = options.compactSession;
-    this.getSessionTodo = options.getSessionTodo;
-    this.sendText = options.sendText ?? (() => undefined);
+    this.inboundHandler = options.onInbound ?? (() => undefined);
     this.logger = options.logger ?? getLogger("telegram");
+    this.sendTextImpl = options.sendText ?? (async (target, text) => {
+      await sendTelegramText(target, text, createTelegramApi(this.token));
+    });
+    this.createTypingHeartbeatImpl = options.createTypingHeartbeat ?? ((target) =>
+      createTelegramTypingHeartbeat(target, createTelegramApi(this.token), {
+        onError: (error) => {
+          this.logger.warn(
+            {
+              err: error,
+              conversationId: target.conversationId
+            },
+            "failed to send telegram typing action"
+          );
+        }
+      }));
 
     if (this.bot) {
       this.registerMessageHandler(this.bot);
     }
   }
 
+  setInboundHandler(handler: (envelope: InboundEnvelope) => MaybePromise<unknown>): void {
+    this.inboundHandler = handler;
+  }
+
+  async sendText(target: DeliveryTarget, text: string): Promise<void> {
+    await this.sendTextImpl(target, text);
+  }
+
+  async createTypingHeartbeat(target: DeliveryTarget): Promise<TelegramTypingHeartbeat> {
+    return await this.createTypingHeartbeatImpl(target);
+  }
+
   private registerMessageHandler(bot: TelegramPollingBot): void {
     bot.on("message", (context) => {
-      const inbound = normalizeTelegramUpdate(context.update);
+      const envelope = normalizeTelegramUpdate(context.update);
 
-      if (!inbound) {
+      if (!envelope) {
         return;
       }
 
-      void this.handleInboundMessage(inbound, context.update).catch((error: unknown) => {
+      void Promise.resolve(this.inboundHandler(envelope)).catch((error: unknown) => {
         this.logger.error(
           {
             err: error,
-            senderId: inbound.senderId,
-            conversationId: inbound.conversationId
+            senderId: envelope.message.senderId,
+            conversationId: envelope.message.conversationId
           },
-          "failed to enqueue telegram message"
+          "failed to handle telegram message"
         );
       });
     });
-  }
-
-  private async handleInboundMessage(inbound: InboundMessage, update: TelegramUpdate): Promise<void> {
-    if (this.pairingService && !await this.pairingService.isApprovedSender(inbound.senderId)) {
-      const pairingInput: { senderId: string; username?: string } = {
-        senderId: inbound.senderId
-      };
-
-      if (update.message?.from?.username) {
-        pairingInput.username = update.message.from.username;
-      }
-
-      const request = await this.pairingService.getOrCreatePendingRequest({
-        ...pairingInput
-      });
-
-      await this.sendText(
-        {
-          channel: "telegram",
-          accountId: "default",
-          chatType: "direct",
-          conversationId: inbound.conversationId
-        },
-        `Your BaliClaw pairing code is ${request.code}. Ask an operator to approve it before sending more messages.`
-      );
-      return;
-    }
-
-    if (this.resetSession && isNewSessionCommand(inbound.text)) {
-      const reply = await this.resetSession(inbound);
-      await this.sendText(
-        {
-          channel: "telegram",
-          accountId: "default",
-          chatType: "direct",
-          conversationId: inbound.conversationId
-        },
-        reply ?? "Started a fresh session. Your next message will use a new Claude session."
-      );
-      return;
-    }
-
-    if (this.compactSession && isCompactSessionCommand(inbound.text)) {
-      const reply = await this.compactSession(inbound);
-      await this.sendText(
-        {
-          channel: "telegram",
-          accountId: "default",
-          chatType: "direct",
-          conversationId: inbound.conversationId
-        },
-        reply ?? "Compacted the current session."
-      );
-      return;
-    }
-
-    if (this.getSessionTodo && isTodoSessionCommand(inbound.text)) {
-      const reply = await this.getSessionTodo(inbound);
-      await this.sendText(
-        {
-          channel: "telegram",
-          accountId: "default",
-          chatType: "direct",
-          conversationId: inbound.conversationId
-        },
-        reply ?? "No task list is available for the current session yet."
-      );
-      return;
-    }
-
-    await this.enqueueInbound(inbound);
   }
 
   async start(): Promise<void> {
@@ -262,19 +216,4 @@ function toTelegramServiceError(error: unknown): Error {
   }
 
   return new Error(`Unknown Telegram error: ${String(error)}`);
-}
-
-function isNewSessionCommand(text: string): boolean {
-  const normalized = text.trim();
-  return /^\/new(?:@[A-Za-z0-9_]+)?$/.test(normalized);
-}
-
-function isCompactSessionCommand(text: string): boolean {
-  const normalized = text.trim();
-  return /^\/compact(?:@[A-Za-z0-9_]+)?$/.test(normalized);
-}
-
-function isTodoSessionCommand(text: string): boolean {
-  const normalized = text.trim();
-  return /^\/todo(?:@[A-Za-z0-9_]+)?$/.test(normalized);
 }

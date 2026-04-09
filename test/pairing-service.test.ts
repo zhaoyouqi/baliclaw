@@ -15,12 +15,13 @@ describe("PairingService", () => {
 
     try {
       const request = await service.getOrCreatePendingRequest({
-        senderId: "12345",
+        channel: "telegram",
+        principalKey: "12345",
         username: "alice",
         now
       });
 
-      expect(request.senderId).toBe("12345");
+      expect(request.principalKey).toBe("12345");
       expect(request.username).toBe("alice");
       expect(request.code).toMatch(/^[A-Z2-9]{8}$/);
       expect(request.code).not.toMatch(/[IO01]/);
@@ -42,12 +43,14 @@ describe("PairingService", () => {
 
     try {
       const first = await service.getOrCreatePendingRequest({
-        senderId: "12345",
+        channel: "telegram",
+        principalKey: "12345",
         username: "alice",
         now
       });
       const second = await service.getOrCreatePendingRequest({
-        senderId: "12345",
+        channel: "telegram",
+        principalKey: "12345",
         username: "alice-updated",
         now: new Date("2026-03-22T10:10:00.000Z")
       });
@@ -69,16 +72,20 @@ describe("PairingService", () => {
 
     try {
       const request = await service.getOrCreatePendingRequest({
-        senderId: "12345",
+        channel: "telegram",
+        principalKey: "12345",
         username: "alice",
         now
       });
-      const approved = await service.approve(request.code, new Date("2026-03-22T10:30:00.000Z"));
+      const approved = await service.approve("telegram", request.code, new Date("2026-03-22T10:30:00.000Z"));
 
       expect(approved).toEqual(request);
-      await expect(service.isApprovedSender("12345")).resolves.toBe(true);
+      await expect(service.isApprovedPrincipal({
+        channel: "telegram",
+        principalKey: "12345"
+      })).resolves.toBe(true);
       await expect(store.loadAllowlist()).resolves.toEqual({
-        approvedSenderIds: ["12345"]
+        approvedPrincipalKeys: ["12345"]
       });
       await expect(store.loadPendingRequests()).resolves.toEqual({
         requests: []
@@ -97,8 +104,10 @@ describe("PairingService", () => {
       await store.savePendingRequests({
         requests: [
           {
+            channel: "telegram",
+            accountId: "default",
             code: "ABCDEFGH",
-            senderId: "12345",
+            principalKey: "12345",
             createdAt: "2026-03-22T10:00:00.000Z",
             expiresAt: "2026-03-22T11:00:00.000Z"
           }
@@ -106,7 +115,7 @@ describe("PairingService", () => {
       });
 
       await expect(
-        service.approve("abcdefgh", new Date("2026-03-22T11:00:01.000Z"))
+        service.approve("telegram", "abcdefgh", new Date("2026-03-22T11:00:01.000Z"))
       ).rejects.toThrow("Pairing code is invalid or expired");
       await expect(store.loadPendingRequests()).resolves.toEqual({
         requests: []
@@ -123,12 +132,12 @@ describe("PairingService", () => {
     const now = new Date("2026-03-22T10:00:00.000Z");
 
     try {
-      await service.getOrCreatePendingRequest({ senderId: "1", now });
-      await service.getOrCreatePendingRequest({ senderId: "2", now });
-      await service.getOrCreatePendingRequest({ senderId: "3", now });
+      await service.getOrCreatePendingRequest({ channel: "telegram", principalKey: "1", now });
+      await service.getOrCreatePendingRequest({ channel: "telegram", principalKey: "2", now });
+      await service.getOrCreatePendingRequest({ channel: "telegram", principalKey: "3", now });
 
       await expect(
-        service.getOrCreatePendingRequest({ senderId: "4", now })
+        service.getOrCreatePendingRequest({ channel: "telegram", principalKey: "4", now })
       ).rejects.toThrow("Maximum pending pairing requests reached");
     } finally {
       await rm(home, { recursive: true, force: true });

@@ -19,12 +19,18 @@ const scheduledTaskScheduleSchema = z.discriminatedUnion("kind", [
   }).strict()
 ]);
 
+export const scheduledTaskDeliverySchema = z.object({
+  channel: z.string().trim().min(1),
+  accountId: z.string().trim().min(1).default("default"),
+  chatType: z.enum(["direct", "group", "channel"]),
+  conversationId: z.string().trim().min(1),
+  threadId: z.string().trim().min(1).optional()
+}).strict();
+
 export const scheduledTaskDefinitionSchema = z.object({
   schedule: scheduledTaskScheduleSchema,
   prompt: z.string().min(1),
-  telegram: z.object({
-    conversationId: z.string().min(1)
-  }).strict(),
+  delivery: scheduledTaskDeliverySchema,
   timeoutMinutes: z.number().int().positive().default(30)
 }).strict();
 

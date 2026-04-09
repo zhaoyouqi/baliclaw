@@ -236,14 +236,14 @@ describe("bootstrap", () => {
       expect(pairingService.isApprovedSender).toHaveBeenCalledWith("42");
       expect(sessionService.runTurn).toHaveBeenCalledTimes(1);
       expect(agentService.handleMessageWithMetadata).toHaveBeenCalledWith(
-        {
+        expect.objectContaining({
           channel: "telegram",
           accountId: "default",
           chatType: "direct",
           conversationId: "42",
           senderId: "42",
           text: "hello"
-        },
+        }),
         {
           cwd: "/tmp/runtime",
           sessionId: "telegram:default:direct:42",
@@ -263,7 +263,8 @@ describe("bootstrap", () => {
           memoryEnabled: false,
           memoryMaxLines: 42,
           tools: ["Read", "Write"]
-        }
+        },
+        "telegram:default:direct:42"
       );
       expect(sendText).toHaveBeenCalledWith(
         {
@@ -592,14 +593,14 @@ describe("bootstrap", () => {
       expect(pairingService.isApprovedSender).toHaveBeenCalledWith("42");
       expect(sessionService.runTurn).toHaveBeenCalledTimes(1);
       expect(agentService.compactSession).toHaveBeenCalledWith(
-        {
+        expect.objectContaining({
           channel: "telegram",
           accountId: "default",
           chatType: "direct",
           conversationId: "42",
           senderId: "42",
           text: "/compact"
-        },
+        }),
         {
           cwd: "/tmp/baliclaw",
           sessionId: "telegram:default:direct:42",
@@ -608,7 +609,8 @@ describe("bootstrap", () => {
           tools: ["Bash", "Read", "Write", "Edit"],
           memoryEnabled: true,
           memoryMaxLines: 200
-        }
+        },
+        "telegram:default:direct:42"
       );
       expect(agentService.handleMessageWithMetadata).not.toHaveBeenCalled();
       expect(sendText).toHaveBeenCalledWith(
@@ -636,7 +638,8 @@ describe("bootstrap", () => {
       getOrCreatePendingRequest: vi.fn()
     } as never;
     const sessionService = {
-      runTurn: vi.fn()
+      runTurn: vi.fn(async (message: InboundMessage, handler: (message: InboundMessage, sessionId: string) => Promise<string>) =>
+        handler(message, "telegram:default:direct:42"))
     } as never;
     const agentService = {
       handleMessage: vi.fn(),
@@ -684,7 +687,7 @@ describe("bootstrap", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(sessionService.runTurn).not.toHaveBeenCalled();
+      expect(sessionService.runTurn).toHaveBeenCalledTimes(1);
       expect(agentService.handleMessageWithMetadata).not.toHaveBeenCalled();
       expect(agentService.getTodoSummary).toHaveBeenCalledWith("telegram:default:direct:42");
       expect(sendText).toHaveBeenCalledWith(
@@ -763,6 +766,9 @@ describe("bootstrap", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(pairingService.getOrCreatePendingRequest).toHaveBeenCalledWith({
+        channel: "telegram",
+        accountId: "default",
+        principalKey: "42",
         senderId: "42",
         username: "alice"
       });
@@ -916,7 +922,8 @@ describe("bootstrap", () => {
           memoryEnabled: true,
           memoryMaxLines: 200,
           tools: ["Read"]
-        }
+        },
+        "telegram:default:direct:42"
       );
       expect(agentService.handleMessageWithMetadata).toHaveBeenNthCalledWith(
         2,
@@ -932,7 +939,8 @@ describe("bootstrap", () => {
           memoryEnabled: true,
           memoryMaxLines: 200,
           tools: ["Bash", "Write"]
-        }
+        },
+        "telegram:default:direct:42"
       );
       expect(context.logger.level).toBe("debug");
     } finally {
@@ -1083,7 +1091,8 @@ describe("bootstrap", () => {
           memoryEnabled: true,
           memoryMaxLines: 200,
           tools: ["Bash", "Read", "Write", "Edit"]
-        }
+        },
+        "telegram:default:direct:41"
       );
       expect(agentService.handleMessageWithMetadata).toHaveBeenNthCalledWith(
         2,
@@ -1096,7 +1105,8 @@ describe("bootstrap", () => {
           memoryEnabled: true,
           memoryMaxLines: 200,
           tools: ["Bash", "Read", "Write", "Edit"]
-        }
+        },
+        "telegram:default:direct:42"
       );
       expect(callOrder).toEqual([
         "start:telegram:default:direct:41",

@@ -5,8 +5,10 @@ import {
 } from "../src/cli/commands/pairing.js";
 
 const pendingRequest = {
+  channel: "telegram",
+  accountId: "default",
   code: "ABCD2345",
-  senderId: "42",
+  principalKey: "42",
   username: "alice",
   createdAt: "2026-03-23T09:00:00.000Z",
   expiresAt: "2026-03-23T10:00:00.000Z"
@@ -35,14 +37,12 @@ describe("CLI pairing commands", () => {
     expect(client.approvePairingCode).toHaveBeenCalledWith("telegram", "ABCD2345");
   });
 
-  it("rejects unsupported pairing channels before calling IPC", async () => {
+  it("passes through arbitrary pairing channels to IPC", async () => {
     const client = {
-      listPairingRequests: vi.fn()
+      listPairingRequests: vi.fn().mockResolvedValue([])
     } as never;
 
-    await expect(runPairingListCommand("slack", client)).rejects.toThrow(
-      "Unsupported pairing channel: slack"
-    );
-    expect(client.listPairingRequests).not.toHaveBeenCalled();
+    await expect(runPairingListCommand("slack", client)).resolves.toBe("[]");
+    expect(client.listPairingRequests).toHaveBeenCalledWith("slack");
   });
 });

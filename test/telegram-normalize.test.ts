@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { normalizeTelegramUpdate } from "../src/telegram/normalize.js";
 
 describe("normalizeTelegramUpdate", () => {
-  it("normalizes a Telegram private text message into an inbound message", () => {
+  it("normalizes a Telegram private text message into an inbound envelope", () => {
     expect(
       normalizeTelegramUpdate({
         message: {
@@ -12,12 +12,22 @@ describe("normalizeTelegramUpdate", () => {
         }
       })
     ).toEqual({
-      channel: "telegram",
-      accountId: "default",
-      chatType: "direct",
-      conversationId: "42",
-      senderId: "42",
-      text: "hello from telegram"
+      message: {
+        channel: "telegram",
+        accountId: "default",
+        chatType: "direct",
+        conversationId: "42",
+        senderId: "42",
+        text: "hello from telegram"
+      },
+      deliveryTarget: {
+        channel: "telegram",
+        accountId: "default",
+        chatType: "direct",
+        conversationId: "42"
+      },
+      sessionKey: "telegram:default:direct:42",
+      principalKey: "42"
     });
   });
 

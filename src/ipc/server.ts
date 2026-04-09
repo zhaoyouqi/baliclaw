@@ -36,6 +36,7 @@ export interface IpcServerOptions {
   configService?: ConfigService;
   scheduledTaskManager?: ScheduledTaskManager;
   pairingService?: PairingService;
+  supportedPairingChannels?: string[];
   reloadConfig?: () => Promise<object>;
   getStatus?: () => Promise<AppStatus> | AppStatus;
 }
@@ -46,6 +47,7 @@ export class IpcServer {
   private readonly configService: ConfigService;
   private readonly scheduledTaskManager: ScheduledTaskManager;
   private readonly pairingService: PairingService;
+  private readonly supportedPairingChannels: Set<string>;
   private readonly reloadConfig: (() => Promise<object>) | undefined;
   private readonly resolveStatus: () => Promise<AppStatus> | AppStatus;
   private server: Server | null = null;
@@ -60,6 +62,7 @@ export class IpcServer {
       this.paths
     );
     this.pairingService = options.pairingService ?? new PairingService();
+    this.supportedPairingChannels = new Set(options.supportedPairingChannels ?? ["telegram"]);
     this.reloadConfig = options.reloadConfig;
     this.resolveStatus = options.getStatus ?? (() => ({
       ok: true,
@@ -152,14 +155,14 @@ export class IpcServer {
       }
 
       if (method === "GET" && url.pathname === "/v1/pairing/list") {
-        const channel = url.searchParams.get("channel");
+        const channel = url.searchParams.get("channel")?.trim() ?? "";
 
-        if (channel !== "telegram") {
+        if (!this.supportedPairingChannels.has(channel)) {
           this.writeJson(response, 400, {
             ok: false,
             error: {
               code: "IPC_INVALID_REQUEST",
-              message: "Pairing channel must be telegram"
+              message: `Unsupported pairing channel: ${channel || "<empty>"}`
             }
           } satisfies IpcErrorResponse);
           return;
@@ -167,7 +170,7 @@ export class IpcServer {
 
         this.writeJson(response, 200, {
           channel,
-          requests: await handlePairingList(this.pairingService)
+          requests: await handlePairingList(this.pairingService, channel)
         });
         return;
       }
@@ -244,9 +247,21 @@ export class IpcServer {
 
       if (method === "POST" && url.pathname === "/v1/pairing/approve") {
         const body = pairingApproveRequestSchema.parse(await this.readJsonBody(request));
+
+        if (!this.supportedPairingChannels.has(body.channel)) {
+          this.writeJson(response, 400, {
+            ok: false,
+            error: {
+              code: "IPC_INVALID_REQUEST",
+              message: `Unsupported pairing channel: ${body.channel}`
+            }
+          } satisfies IpcErrorResponse);
+          return;
+        }
+
         this.writeJson(response, 200, {
           channel: body.channel,
-          approved: await handlePairingApprove(this.pairingService, body.code)
+          approved: await handlePairingApprove(this.pairingService, body.channel, body.code)
         });
         return;
       }

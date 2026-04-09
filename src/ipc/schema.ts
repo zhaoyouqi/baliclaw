@@ -6,11 +6,13 @@ import {
 } from "../config/scheduled-task-config.js";
 import { scheduledTaskStatusEntrySchema } from "../runtime/scheduled-task-status-store.js";
 
-const pairingChannelSchema = z.literal("telegram");
+const pairingChannelSchema = z.string().trim().min(1);
 
 export const pairingRequestSchema = z.object({
+  channel: z.string(),
+  accountId: z.string(),
   code: z.string(),
-  senderId: z.string(),
+  principalKey: z.string(),
   username: z.string().optional(),
   createdAt: z.string(),
   expiresAt: z.string()

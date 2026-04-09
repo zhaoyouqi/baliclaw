@@ -1,21 +1,16 @@
-import { PairingService } from "../auth/pairing-service.js";
 import type { Logger } from "pino";
-import { ConfigService } from "../config/service.js";
+import { PairingService } from "../auth/pairing-service.js";
+import type { ChannelAdapter } from "../channel/adapter.js";
+import { InboundRouter } from "../channel/router.js";
 import { ensureStateDirectories, getAppPaths, type AppPaths } from "../config/paths.js";
-import type { AppConfig } from "../config/schema.js";
 import { ScheduledTaskConfigService } from "../config/scheduled-task-config.js";
+import type { AppConfig } from "../config/schema.js";
+import { ConfigService } from "../config/service.js";
 import { IpcServer } from "../ipc/server.js";
 import { AgentService, type ScheduledAgentRunOptions } from "../runtime/agent-service.js";
-import { buildTelegramDirectSessionId } from "../session/stable-key.js";
 import { SessionService } from "../session/service.js";
-import {
-  createTelegramApi,
-  createTelegramTypingHeartbeat,
-  sendTelegramText,
-  type TelegramTypingHeartbeat
-} from "../telegram/send.js";
-import { TelegramService, type TelegramPollingBot } from "../telegram/service.js";
 import { getLogger } from "../shared/logger.js";
+import { TelegramService, type TelegramPollingBot } from "../telegram/service.js";
 import { ReloadService } from "./reload-service.js";
 import { ScheduledTaskRunError, ScheduledTaskService } from "./scheduled-task-service.js";
 import { createShutdownController, type ShutdownController } from "./shutdown.js";
@@ -29,6 +24,7 @@ export interface BootstrapContext {
   pairingService: PairingService;
   sessionService: SessionService;
   agentService: AgentService;
+  channelRouter: InboundRouter;
   telegramService: TelegramService;
   scheduledTaskService: ScheduledTaskService;
   reloadService: ReloadService;
@@ -46,10 +42,10 @@ export interface BootstrapOptions {
   agentService?: AgentService;
   scheduledTaskService?: ScheduledTaskService;
   reloadService?: ReloadService;
-  sendText?: (target: Parameters<typeof sendTelegramText>[0], text: string) => Promise<void>;
+  sendText?: (target: Parameters<TelegramService["sendText"]>[0], text: string) => Promise<void>;
   createTypingHeartbeat?: (
-    target: Parameters<typeof sendTelegramText>[0]
-  ) => TelegramTypingHeartbeat | Promise<TelegramTypingHeartbeat>;
+    target: Parameters<TelegramService["createTypingHeartbeat"]>[0]
+  ) => Awaited<ReturnType<TelegramService["createTypingHeartbeat"]>>;
 }
 
 export async function bootstrap(options: BootstrapOptions = {}): Promise<BootstrapContext> {
@@ -82,103 +78,51 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
   const agentService = options.agentService ?? new AgentService({
     logger: agentLogger
   });
-  let activeTelegramService = options.telegramService ?? new TelegramService();
-  let activeScheduledTaskService = options.scheduledTaskService ?? new ScheduledTaskService();
   const shutdownController = createShutdownController(logger);
-  const sendText = options.sendText ?? (async (target, text) => {
-    await sendTelegramText(target, text, createTelegramApi(currentConfig.channels.telegram.botToken));
+  const adapters = new Map<string, ChannelAdapter>();
+
+  let activeTelegramService = options.telegramService ?? createTelegramService();
+  let activeScheduledTaskService = options.scheduledTaskService ?? new ScheduledTaskService();
+
+  const channelRouter = new InboundRouter({
+    pairingService,
+    sessionService,
+    agentService,
+    getAdapter: (channelId) => adapters.get(channelId),
+    buildAgentRunOptions: (sessionKey) => buildAgentRunOptions(currentConfig, sessionKey)
   });
-  const createTypingHeartbeat = options.createTypingHeartbeat ?? ((target) =>
-    createTelegramTypingHeartbeat(target, createTelegramApi(currentConfig.channels.telegram.botToken), {
-      onError: (error) => {
-        telegramLogger.warn(
-          {
-            err: error,
-            conversationId: target.conversationId
-          },
-          "failed to send telegram typing action"
-        );
-      }
-    }));
 
-  const createConfiguredTelegramService = (config: AppConfig): TelegramService => {
-    const telegramServiceOptions: ConstructorParameters<typeof TelegramService>[0] = {
-      token: config.channels.telegram.botToken,
-      pairingService,
-      logger: telegramLogger,
-      enqueueInbound: async (message) => {
-        await sessionService.runTurn(message, async (turnMessage, sessionId) => {
-          const runtimeConfig = currentConfig;
-          const agentRunOptions = buildAgentRunOptions(runtimeConfig, sessionId);
-          const deliveryTarget = {
-            channel: turnMessage.channel,
-            accountId: turnMessage.accountId,
-            chatType: turnMessage.chatType,
-            conversationId: turnMessage.conversationId
-          } as const;
-          const typingHeartbeat = await createTypingHeartbeat(deliveryTarget);
-          let reply: string;
+  const setTelegramInboundHandler = (service: TelegramService): void => {
+    if ("setInboundHandler" in service && typeof service.setInboundHandler === "function") {
+      service.setInboundHandler((envelope) => channelRouter.handleInbound(envelope));
+    }
+  };
 
-          try {
-            const result = await agentService.handleMessageWithMetadata(turnMessage, agentRunOptions);
-            reply = result.text;
+  setTelegramInboundHandler(activeTelegramService);
 
-            if (result.autoCompacted) {
-              const notice = typeof result.autoCompactionPreTokens === "number"
-                ? `Session context was automatically compacted at about ${result.autoCompactionPreTokens} tokens so the conversation could continue.`
-                : "Session context was automatically compacted so the conversation could continue.";
-              await sendText(deliveryTarget, notice);
-            }
-            if (result.todoNotice) {
-              await sendText(deliveryTarget, result.todoNotice);
-            }
-          } finally {
-            await typingHeartbeat.stop();
-          }
+  const activateTelegramService = (service: TelegramService, enabled: boolean): void => {
+    activeTelegramService = service;
+    setTelegramInboundHandler(activeTelegramService);
 
-          if (reply.trim().length === 0) {
-            return;
-          }
-
-          await sendText(deliveryTarget, reply);
-        });
-      },
-      resetSession: async (message) => {
-        await sessionService.runTurn(message, async (_turnMessage, sessionId) => {
-          await agentService.resetSession(sessionId);
-        });
-        return "Started a fresh session. Your next message will use a new Claude session.";
-      },
-      compactSession: async (message) => {
-        return sessionService.runTurn(message, async (turnMessage, sessionId) => {
-          const runtimeConfig = currentConfig;
-          const agentRunOptions = buildAgentRunOptions(runtimeConfig, sessionId);
-          const deliveryTarget = {
-            channel: turnMessage.channel,
-            accountId: turnMessage.accountId,
-            chatType: turnMessage.chatType,
-            conversationId: turnMessage.conversationId
-          } as const;
-          const typingHeartbeat = await createTypingHeartbeat(deliveryTarget);
-
-          try {
-            return await agentService.compactSession(turnMessage, agentRunOptions);
-          } finally {
-            await typingHeartbeat.stop();
-          }
-        });
-      },
-      getSessionTodo: async (message) => {
-        return agentService.getTodoSummary(buildTelegramDirectSessionId(message));
-      },
-      sendText
-    };
-
-    if (options.telegramBot) {
-      telegramServiceOptions.bot = options.telegramBot;
+    if (enabled) {
+      adapters.set(activeTelegramService.channelId, activeTelegramService);
+      return;
     }
 
-    return new TelegramService(telegramServiceOptions);
+    adapters.delete(activeTelegramService.channelId);
+  };
+
+  const sendChannelText = async (
+    target: Parameters<TelegramService["sendText"]>[0],
+    text: string
+  ): Promise<void> => {
+    const adapter = adapters.get(target.channel);
+
+    if (!adapter) {
+      throw new Error(`No channel adapter is registered for ${target.channel}`);
+    }
+
+    await adapter.sendText(target, text);
   };
 
   const createConfiguredScheduledTaskService = (config: AppConfig): ScheduledTaskService =>
@@ -187,12 +131,6 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
       logger: scheduledTaskLogger,
       configService: new ScheduledTaskConfigService(paths, config.scheduledTasks.file),
       onTrigger: async ({ taskId, task, scheduledAt }) => {
-        const deliveryTarget = {
-          channel: "telegram",
-          accountId: "default",
-          chatType: "direct",
-          conversationId: task.telegram.conversationId
-        } as const;
         const abortController = new AbortController();
         const timeoutMs = task.timeoutMinutes * 60 * 1000;
         const timeoutHandle = setTimeout(() => {
@@ -202,44 +140,39 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
 
         try {
           const result = await agentService.runPrompt(task.prompt, {
-          ...buildAgentRunOptions(currentConfig, `scheduled:${taskId}:${scheduledAt}`),
-          abortController
-        });
+            ...buildAgentRunOptions(currentConfig, `scheduled:${taskId}:${scheduledAt}`),
+            abortController
+          });
 
           if (result.autoCompacted) {
             const notice = typeof result.autoCompactionPreTokens === "number"
               ? `Scheduled task ${taskId} auto-compacted at about ${result.autoCompactionPreTokens} tokens so the run could continue.`
               : `Scheduled task ${taskId} auto-compacted so the run could continue.`;
-            await sendText(deliveryTarget, notice);
+            await sendChannelText(toDeliveryTarget(task.delivery), notice);
           }
           if (result.todoNotice) {
-            await sendText(deliveryTarget, result.todoNotice);
+            await sendChannelText(toDeliveryTarget(task.delivery), result.todoNotice);
           }
           if (result.text.trim().length > 0) {
-            await sendText(deliveryTarget, result.text);
+            await sendChannelText(toDeliveryTarget(task.delivery), result.text);
           }
         } catch (error) {
           if (abortController.signal.aborted) {
             const message = `Scheduled task ${taskId} timed out after ${task.timeoutMinutes} minute(s) and was stopped.`;
-            await sendText(deliveryTarget, message);
+            await sendChannelText(toDeliveryTarget(task.delivery), message);
             throw new ScheduledTaskRunError("timed_out", message, "timeout reached");
           }
 
           const reason = error instanceof Error ? error.message : String(error);
-          await sendText(deliveryTarget, `Scheduled task ${taskId} failed: ${reason}`);
+          await sendChannelText(toDeliveryTarget(task.delivery), `Scheduled task ${taskId} failed: ${reason}`);
           throw new ScheduledTaskRunError("failed", `Scheduled task ${taskId} failed`, reason);
         } finally {
           clearTimeout(timeoutHandle);
         }
       },
       onSkip: async ({ taskId, task, scheduledAt, reason }) => {
-        await sendText(
-          {
-            channel: "telegram",
-            accountId: "default",
-            chatType: "direct",
-            conversationId: task.telegram.conversationId
-          },
+        await sendChannelText(
+          toDeliveryTarget(task.delivery),
           `Scheduled task ${taskId} was skipped for the run scheduled at ${scheduledAt}: ${reason}.`
         );
       }
@@ -258,16 +191,18 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     }
 
     if (options.telegramService) {
-      activeTelegramService = options.telegramService;
+      activateTelegramService(options.telegramService, nextConfig.channels.telegram.enabled);
       if (nextConfig.channels.telegram.enabled) {
         await activeTelegramService.start();
       }
       return;
     }
 
-    activeTelegramService = nextConfig.channels.telegram.enabled
-      ? createConfiguredTelegramService(nextConfig)
-      : new TelegramService();
+    const nextService = nextConfig.channels.telegram.enabled
+      ? createTelegramService(nextConfig.channels.telegram.botToken)
+      : createTelegramService();
+
+    activateTelegramService(nextService, nextConfig.channels.telegram.enabled);
 
     if (nextConfig.channels.telegram.enabled) {
       await activeTelegramService.start();
@@ -330,6 +265,7 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     logger: ipcLogger,
     configService,
     pairingService,
+    supportedPairingChannels: ["telegram"],
     reloadConfig: async () => await reloadService.reload("ipc")
   });
 
@@ -345,8 +281,14 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
   });
 
   if (currentConfig.channels.telegram.enabled) {
-    activeTelegramService = options.telegramService ?? createConfiguredTelegramService(currentConfig);
+    if (options.telegramService) {
+      activateTelegramService(options.telegramService, true);
+    } else {
+      activateTelegramService(createTelegramService(currentConfig.channels.telegram.botToken), true);
+    }
     await activeTelegramService.start();
+  } else {
+    activateTelegramService(activeTelegramService, false);
   }
 
   if (currentConfig.scheduledTasks.enabled) {
@@ -379,11 +321,22 @@ export async function bootstrap(options: BootstrapOptions = {}): Promise<Bootstr
     pairingService,
     sessionService,
     agentService,
+    channelRouter,
     telegramService: activeTelegramService,
     scheduledTaskService: activeScheduledTaskService,
     reloadService,
     shutdownController
   };
+
+  function createTelegramService(token = ""): TelegramService {
+    return new TelegramService({
+      token,
+      ...(options.telegramBot ? { bot: options.telegramBot } : {}),
+      ...(options.sendText ? { sendText: options.sendText } : {}),
+      ...(options.createTypingHeartbeat ? { createTypingHeartbeat: options.createTypingHeartbeat } : {}),
+      logger: telegramLogger
+    });
+  }
 }
 
 function buildAgentRunOptions(config: AppConfig, sessionId: string): ScheduledAgentRunOptions {
@@ -423,4 +376,20 @@ function buildAgentRunOptions(config: AppConfig, sessionId: string): ScheduledAg
   options.memoryMaxLines = config.memory.maxLines;
 
   return options;
+}
+
+function toDeliveryTarget(target: {
+  channel: string;
+  accountId: string;
+  chatType: "direct" | "group" | "channel";
+  conversationId: string;
+  threadId?: string | undefined;
+}) {
+  return {
+    channel: target.channel,
+    accountId: target.accountId,
+    chatType: target.chatType,
+    conversationId: target.conversationId,
+    ...(target.threadId ? { threadId: target.threadId } : {})
+  };
 }

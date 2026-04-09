@@ -6,8 +6,8 @@ import { AgentService } from "../../runtime/agent-service.js";
 import type { AgentRunOptions } from "../../runtime/agent-service.js";
 import type { InboundMessage } from "../../shared/types.js";
 
-const localChannel = "telegram" as const;
-const localAccount = "default" as const;
+const localChannel = "tui" as const;
+const localAccount = "local" as const;
 const localChatType = "direct" as const;
 const localSenderId = "local-operator";
 const localConversationId = "local-tui";

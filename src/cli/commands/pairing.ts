@@ -1,7 +1,7 @@
 import { createCliClient } from "../client.js";
 import type { IpcClient } from "../../ipc/client.js";
 
-type PairingChannel = "telegram";
+type PairingChannel = string;
 
 export async function runPairingListCommand(
   channel: string,
@@ -23,9 +23,11 @@ export async function runPairingApproveCommand(
 }
 
 function parsePairingChannel(channel: string): PairingChannel {
-  if (channel !== "telegram") {
-    throw new Error(`Unsupported pairing channel: ${channel}`);
+  const normalizedChannel = channel.trim();
+
+  if (normalizedChannel.length === 0) {
+    throw new Error("Pairing channel must not be empty");
   }
 
-  return channel;
+  return normalizedChannel;
 }

@@ -119,16 +119,20 @@ describe("IpcServer", () => {
       pairingService: {
         listPendingRequests: async () => [
           {
+            channel: "telegram",
+            accountId: "default",
             code: "ABCD2345",
-            senderId: "42",
+            principalKey: "42",
             username: "alice",
             createdAt: "2026-03-23T09:00:00.000Z",
             expiresAt: "2026-03-23T10:00:00.000Z"
           }
         ],
         approve: async () => ({
+          channel: "telegram",
+          accountId: "default",
           code: "ABCD2345",
-          senderId: "42",
+          principalKey: "42",
           username: "alice",
           createdAt: "2026-03-23T09:00:00.000Z",
           expiresAt: "2026-03-23T10:00:00.000Z"
@@ -145,8 +149,10 @@ describe("IpcServer", () => {
           channel: "telegram",
           requests: [
             {
+              channel: "telegram",
+              accountId: "default",
               code: "ABCD2345",
-              senderId: "42",
+              principalKey: "42",
               username: "alice",
               createdAt: "2026-03-23T09:00:00.000Z",
               expiresAt: "2026-03-23T10:00:00.000Z"
@@ -168,8 +174,10 @@ describe("IpcServer", () => {
         body: {
           channel: "telegram",
           approved: {
+            channel: "telegram",
+            accountId: "default",
             code: "ABCD2345",
-            senderId: "42",
+            principalKey: "42",
             username: "alice",
             createdAt: "2026-03-23T09:00:00.000Z",
             expiresAt: "2026-03-23T10:00:00.000Z"
@@ -191,7 +199,10 @@ describe("IpcServer", () => {
         time: "09:00"
       },
       prompt: "Summarize",
-      telegram: {
+      delivery: {
+        channel: "telegram",
+        accountId: "default",
+        chatType: "direct" as const,
         conversationId: "42"
       },
       timeoutMinutes: 30

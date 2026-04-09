@@ -115,8 +115,10 @@ describe("IpcClient", () => {
 
   it("supports pairing list and approve over the shared transport", async () => {
     const request = {
+      channel: "telegram",
+      accountId: "default",
       code: "ABCD2345",
-      senderId: "42",
+      principalKey: "42",
       username: "alice",
       createdAt: "2026-03-23T09:00:00.000Z",
       expiresAt: "2026-03-23T10:00:00.000Z"
@@ -158,7 +160,10 @@ describe("IpcClient", () => {
         time: "09:00"
       },
       prompt: "Summarize",
-      telegram: {
+      delivery: {
+        channel: "telegram",
+        accountId: "default",
+        chatType: "direct" as const,
         conversationId: "42"
       },
       timeoutMinutes: 30

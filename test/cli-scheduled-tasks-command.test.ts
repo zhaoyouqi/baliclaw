@@ -16,7 +16,10 @@ const task = {
     time: "09:00"
   },
   prompt: "Summarize",
-  telegram: {
+  delivery: {
+    channel: "telegram",
+    accountId: "default",
+    chatType: "direct" as const,
     conversationId: "42"
   },
   timeoutMinutes: 30
@@ -62,7 +65,7 @@ describe("CLI scheduled task commands", () => {
     await expect(
       runScheduledTaskCreateCommand(
         "dailySummary",
-        '{ schedule: { kind: "daily", time: "09:00" }, prompt: "Summarize", telegram: { conversationId: "42" } }',
+        '{ schedule: { kind: "daily", time: "09:00" }, prompt: "Summarize", delivery: { channel: "telegram", accountId: "default", chatType: "direct", conversationId: "42" } }',
         {},
         client
       )
@@ -83,7 +86,7 @@ describe("CLI scheduled task commands", () => {
     try {
       await writeFile(
         file,
-        '{ schedule: { kind: "daily", time: "09:00" }, prompt: "Summarize", telegram: { conversationId: "42" }, timeoutMinutes: 45 }\n',
+        '{ schedule: { kind: "daily", time: "09:00" }, prompt: "Summarize", delivery: { channel: "telegram", accountId: "default", chatType: "direct", conversationId: "42" }, timeoutMinutes: 45 }\n',
         "utf8"
       );
 

@@ -15,7 +15,7 @@ describe("PairingStore", () => {
         requests: []
       });
       await expect(store.loadAllowlist()).resolves.toEqual({
-        approvedSenderIds: []
+        approvedPrincipalKeys: []
       });
     } finally {
       await rm(home, { recursive: true, force: true });
@@ -31,8 +31,10 @@ describe("PairingStore", () => {
       await store.savePendingRequests({
         requests: [
           {
+            channel: "telegram",
+            accountId: "default",
             code: "ABCD2345",
-            senderId: "12345",
+            principalKey: "12345",
             username: "alice",
             createdAt: "2026-03-22T10:00:00.000Z",
             expiresAt: "2026-03-22T11:00:00.000Z"
@@ -40,14 +42,16 @@ describe("PairingStore", () => {
         ]
       });
       await store.saveAllowlist({
-        approvedSenderIds: ["12345", "67890"]
+        approvedPrincipalKeys: ["12345", "67890"]
       });
 
       await expect(store.loadPendingRequests()).resolves.toEqual({
         requests: [
           {
+            channel: "telegram",
+            accountId: "default",
             code: "ABCD2345",
-            senderId: "12345",
+            principalKey: "12345",
             username: "alice",
             createdAt: "2026-03-22T10:00:00.000Z",
             expiresAt: "2026-03-22T11:00:00.000Z"
@@ -55,7 +59,7 @@ describe("PairingStore", () => {
         ]
       });
       await expect(store.loadAllowlist()).resolves.toEqual({
-        approvedSenderIds: ["12345", "67890"]
+        approvedPrincipalKeys: ["12345", "67890"]
       });
 
       await expect(readFile(paths.pendingPairingFile, "utf8")).resolves.toContain("'ABCD2345'");
@@ -74,8 +78,10 @@ describe("PairingStore", () => {
       await store.savePendingRequests({
         requests: [
           {
+            channel: "telegram",
+            accountId: "default",
             code: "FIRST111",
-            senderId: "111",
+            principalKey: "111",
             createdAt: "2026-03-22T10:00:00.000Z",
             expiresAt: "2026-03-22T11:00:00.000Z"
           }
@@ -84,25 +90,26 @@ describe("PairingStore", () => {
       await store.savePendingRequests({
         requests: [
           {
+            channel: "telegram",
+            accountId: "default",
             code: "SECOND22",
-            senderId: "222",
+            principalKey: "222",
             createdAt: "2026-03-22T12:00:00.000Z",
             expiresAt: "2026-03-22T13:00:00.000Z"
           }
         ]
       });
       await store.saveAllowlist({
-        approvedSenderIds: ["222"]
+        approvedPrincipalKeys: ["222"]
       });
       await store.saveAllowlist({
-        approvedSenderIds: ["333"]
+        approvedPrincipalKeys: ["333"]
       });
 
       await expect(readFile(paths.pendingPairingFile, "utf8")).resolves.toContain("'SECOND22'");
       await expect(readFile(paths.allowlistFile, "utf8")).resolves.toContain("'333'");
       await expect(readdir(paths.pairingDir).then((entries) => entries.sort())).resolves.toEqual([
-        "telegram-allowlist.json",
-        "telegram-pending.json"
+        "telegram"
       ]);
     } finally {
       await rm(home, { recursive: true, force: true });

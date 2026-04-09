@@ -23,7 +23,10 @@ describe("ScheduledTaskService", () => {
                 time: "09:00"
               },
               prompt: "Summarize",
-              telegram: {
+              delivery: {
+                channel: "telegram",
+                accountId: "default",
+                chatType: "direct",
                 conversationId: "42"
               },
               timeoutMinutes: 30
@@ -65,7 +68,10 @@ describe("ScheduledTaskService", () => {
                 intervalHours: 1
               },
               prompt: "Summarize",
-              telegram: {
+              delivery: {
+                channel: "telegram",
+                accountId: "default",
+                chatType: "direct",
                 conversationId: "42"
               },
               timeoutMinutes: 30

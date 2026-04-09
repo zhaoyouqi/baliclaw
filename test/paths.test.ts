@@ -12,8 +12,8 @@ describe("getAppPaths", () => {
     expect(paths.configFile).toBe("/tmp/example-home/.baliclaw/baliclaw.json5");
     expect(paths.scheduledTasksFile).toBe("/tmp/example-home/.baliclaw/scheduled-tasks.json5");
     expect(paths.socketFile).toBe("/tmp/example-home/.baliclaw/baliclaw.sock");
-    expect(paths.pendingPairingFile).toBe("/tmp/example-home/.baliclaw/pairing/telegram-pending.json");
-    expect(paths.allowlistFile).toBe("/tmp/example-home/.baliclaw/pairing/telegram-allowlist.json");
+    expect(paths.pendingPairingFile).toBe("/tmp/example-home/.baliclaw/pairing/telegram/default-pending.json");
+    expect(paths.allowlistFile).toBe("/tmp/example-home/.baliclaw/pairing/telegram/default-allowlist.json");
     expect(paths.scheduledTasksDir).toBe("/tmp/example-home/.baliclaw/scheduled-tasks");
     expect(paths.scheduledTaskStatusFile).toBe("/tmp/example-home/.baliclaw/scheduled-tasks/status.json");
     expect(paths.memoryDir).toBe("/tmp/example-home/.baliclaw/memory");

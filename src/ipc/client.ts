@@ -66,7 +66,7 @@ export class IpcClient {
     });
   }
 
-  async listPairingRequests(channel: "telegram" = "telegram"): Promise<PairingRequest[]> {
+  async listPairingRequests(channel = "telegram"): Promise<PairingRequest[]> {
     const response = await this.performRequest(
       `/v1/pairing/list?channel=${channel}`,
       pairingListResponseSchema,
@@ -78,7 +78,7 @@ export class IpcClient {
     return response.requests;
   }
 
-  async approvePairingCode(channel: "telegram", code: string): Promise<PairingRequest> {
+  async approvePairingCode(channel: string, code: string): Promise<PairingRequest> {
     const response = await this.performRequest(
       "/v1/pairing/approve",
       pairingApproveResponseSchema,

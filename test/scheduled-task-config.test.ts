@@ -20,7 +20,10 @@ describe("scheduledTaskFileSchema", () => {
             intervalHours: 6
           },
           prompt: "Ping",
-          telegram: {
+          delivery: {
+            channel: "telegram",
+            accountId: "default",
+            chatType: "direct",
             conversationId: "123"
           }
         },
@@ -30,7 +33,10 @@ describe("scheduledTaskFileSchema", () => {
             time: "09:00"
           },
           prompt: "Summarize",
-          telegram: {
+          delivery: {
+            channel: "telegram",
+            accountId: "default",
+            chatType: "direct",
             conversationId: "123"
           }
         },
@@ -41,7 +47,10 @@ describe("scheduledTaskFileSchema", () => {
             time: "18:30"
           },
           prompt: "Report",
-          telegram: {
+          delivery: {
+            channel: "telegram",
+            accountId: "default",
+            chatType: "direct",
             conversationId: "123"
           }
         }
@@ -66,7 +75,10 @@ describe("scheduledTaskFileSchema", () => {
               time: "9am"
             },
             prompt: "",
-            telegram: {
+            delivery: {
+              channel: "telegram",
+              accountId: "default",
+              chatType: "direct",
               conversationId: ""
             }
           }
@@ -113,7 +125,10 @@ describe("ScheduledTaskConfigService", () => {
                 time: "18:00"
               },
               prompt: "x",
-              telegram: {
+              delivery: {
+                channel: "telegram",
+                accountId: "default",
+                chatType: "direct",
                 conversationId: "123"
               }
             }

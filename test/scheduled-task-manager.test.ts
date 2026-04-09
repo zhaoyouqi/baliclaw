@@ -7,7 +7,10 @@ const task = {
     time: "09:00"
   },
   prompt: "Summarize",
-  telegram: {
+  delivery: {
+    channel: "telegram",
+    accountId: "default",
+    chatType: "direct" as const,
     conversationId: "42"
   },
   timeoutMinutes: 30

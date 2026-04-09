@@ -1,6 +1,6 @@
-export type Channel = "telegram";
-export type AccountId = "default";
-export type ChatType = "direct";
+export type Channel = string;
+export type AccountId = string;
+export type ChatType = "direct" | "group" | "channel";
 
 export interface InboundMessage {
   channel: Channel;
@@ -9,6 +9,8 @@ export interface InboundMessage {
   conversationId: string;
   senderId: string;
   text: string;
+  threadId?: string;
+  messageId?: string;
 }
 
 export interface DeliveryTarget {
@@ -16,11 +18,22 @@ export interface DeliveryTarget {
   accountId: AccountId;
   chatType: ChatType;
   conversationId: string;
+  threadId?: string;
+}
+
+export interface InboundEnvelope {
+  message: InboundMessage;
+  deliveryTarget: DeliveryTarget;
+  sessionKey: string;
+  principalKey: string;
+  username?: string;
 }
 
 export interface PairingRequest {
+  channel: Channel;
+  accountId: AccountId;
   code: string;
-  senderId: string;
+  principalKey: string;
   username?: string | undefined;
   createdAt: string;
   expiresAt: string;

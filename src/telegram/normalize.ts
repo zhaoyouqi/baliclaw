@@ -1,4 +1,5 @@
-import type { InboundMessage } from "../shared/types.js";
+import { buildTelegramDirectSessionId } from "../session/stable-key.js";
+import type { InboundEnvelope } from "../shared/types.js";
 
 export interface TelegramUser {
   id: number;
@@ -21,7 +22,7 @@ export interface TelegramUpdate {
   message?: TelegramMessage;
 }
 
-export function normalizeTelegramUpdate(update: TelegramUpdate): InboundMessage | null {
+export function normalizeTelegramUpdate(update: TelegramUpdate): InboundEnvelope | null {
   const message = update.message;
 
   if (!message) {
@@ -43,12 +44,26 @@ export function normalizeTelegramUpdate(update: TelegramUpdate): InboundMessage 
     return null;
   }
 
-  return {
+  const inboundMessage = {
     channel: "telegram",
     accountId: "default",
-    chatType: "direct",
+    chatType: "direct" as const,
     conversationId: String(chatId),
     senderId: String(senderId),
-    text: message.text
+    text: message.text,
+    ...(Number.isInteger(message.message_id) ? { messageId: String(message.message_id) } : {})
+  };
+
+  return {
+    message: inboundMessage,
+    deliveryTarget: {
+      channel: inboundMessage.channel,
+      accountId: inboundMessage.accountId,
+      chatType: inboundMessage.chatType,
+      conversationId: inboundMessage.conversationId
+    },
+    sessionKey: buildTelegramDirectSessionId(inboundMessage),
+    principalKey: inboundMessage.senderId,
+    ...(message.from?.username ? { username: message.from.username } : {})
   };
 }

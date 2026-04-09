@@ -2,7 +2,7 @@ import type { Logger } from "pino";
 import type { McpServerConfig as SdkMcpServerConfig } from "@anthropic-ai/claude-agent-sdk";
 import type { AgentDefinitionConfig } from "../config/schema.js";
 import type { InboundMessage } from "../shared/types.js";
-import { buildTelegramDirectSessionId } from "../session/stable-key.js";
+import { buildDefaultSessionKey } from "../session/stable-key.js";
 import { getLogger } from "../shared/logger.js";
 import { queryAgent, type QueryRequest } from "./sdk.js";
 import {
@@ -364,7 +364,7 @@ function normalizeAgentRunOptions(
   if (typeof optionsOrCwd === "string") {
     return {
       cwd: optionsOrCwd,
-      sessionId: sessionIdOverride ?? buildTelegramDirectSessionId(message),
+      sessionId: sessionIdOverride ?? buildDefaultSessionKey(message),
       interactionContext: buildInteractionContext(message)
     };
   }
@@ -372,7 +372,7 @@ function normalizeAgentRunOptions(
   return {
     ...optionsOrCwd,
     cwd: optionsOrCwd.cwd,
-    sessionId: optionsOrCwd.sessionId ?? buildTelegramDirectSessionId(message),
+    sessionId: optionsOrCwd.sessionId ?? buildDefaultSessionKey(message),
     interactionContext: optionsOrCwd.interactionContext ?? buildInteractionContext(message)
   };
 }
@@ -386,10 +386,13 @@ function buildInteractionContext(message: InboundMessage): string {
     `- accountId: ${message.accountId}`,
     `- chatType: ${message.chatType}`,
     `- conversationId: ${message.conversationId}`,
+    ...(message.threadId ? [`- threadId: ${message.threadId}`] : []),
+    ...(message.messageId ? [`- messageId: ${message.messageId}`] : []),
     `- senderId: ${message.senderId}`,
     `- daemonTimezone: ${timezone}`,
     "",
-    "If you create or update a scheduled task for this user, use the current conversationId as the Telegram delivery target unless the user explicitly asks for a different target.",
+    "If you create or update a scheduled task for this user, prefer the current conversation as the delivery target unless the user explicitly asks for a different target.",
+    "Use the current channel, accountId, chatType, conversationId, and threadId (when present) for that delivery target.",
     "When the user mentions another timezone, convert it to daemonTimezone before creating the scheduled task."
   ].join("\n");
 }

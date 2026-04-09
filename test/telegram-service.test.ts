@@ -32,27 +32,6 @@ describe("TelegramService", () => {
     await service.stop();
 
     expect(bot.api.setMyCommands).toHaveBeenCalledTimes(1);
-    expect(bot.api.setMyCommands).toHaveBeenCalledWith(
-      [
-        {
-          command: "compact",
-          description: "Compact the current session"
-        },
-        {
-          command: "new",
-          description: "Start a fresh session"
-        },
-        {
-          command: "todo",
-          description: "Show the current task list"
-        }
-      ],
-      {
-        scope: {
-          type: "all_private_chats"
-        }
-      }
-    );
     expect(bot.start).toHaveBeenCalledTimes(1);
     expect(bot.stop).toHaveBeenCalledTimes(1);
   });
@@ -76,23 +55,51 @@ describe("TelegramService", () => {
     await service.stop();
   });
 
-  it("enqueues only private text messages", async () => {
+  it("forwards normalized private text messages as inbound envelopes", async () => {
     const bot = new FakeTelegramBot();
-    const enqueueInbound = vi.fn();
-    const service = new TelegramService({ bot, enqueueInbound });
-
-    expect(service).toBeDefined();
-    expect(bot.handler).toBeTypeOf("function");
+    const onInbound = vi.fn();
+    new TelegramService({ bot, onInbound });
 
     bot.handler?.({
       update: {
         message: {
-          from: { id: 42 },
+          from: { id: 42, username: "alice" },
           chat: { id: 42, type: "private" },
+          message_id: 99,
           text: "hello"
         }
       }
     });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(onInbound).toHaveBeenCalledTimes(1);
+    expect(onInbound).toHaveBeenCalledWith({
+      message: {
+        channel: "telegram",
+        accountId: "default",
+        chatType: "direct",
+        conversationId: "42",
+        senderId: "42",
+        messageId: "99",
+        text: "hello"
+      },
+      deliveryTarget: {
+        channel: "telegram",
+        accountId: "default",
+        chatType: "direct",
+        conversationId: "42"
+      },
+      sessionKey: "telegram:default:direct:42",
+      principalKey: "42",
+      username: "alice"
+    });
+  });
+
+  it("ignores non-private and non-text updates", async () => {
+    const bot = new FakeTelegramBot();
+    const onInbound = vi.fn();
+    new TelegramService({ bot, onInbound });
 
     bot.handler?.({
       update: {
@@ -103,7 +110,6 @@ describe("TelegramService", () => {
         }
       }
     });
-
     bot.handler?.({
       update: {
         message: {
@@ -113,329 +119,21 @@ describe("TelegramService", () => {
       }
     });
 
-    expect(enqueueInbound).toHaveBeenCalledTimes(1);
-    expect(enqueueInbound).toHaveBeenCalledWith({
-      channel: "telegram",
-      accountId: "default",
-      chatType: "direct",
-      conversationId: "42",
-      senderId: "42",
-      text: "hello"
-    });
-  });
-
-  it("sends a pairing code and skips enqueue for unauthorized senders", async () => {
-    const bot = new FakeTelegramBot();
-    const enqueueInbound = vi.fn();
-    const sendText = vi.fn();
-    const pairingService = {
-      isApprovedSender: vi.fn().mockResolvedValue(false),
-      getOrCreatePendingRequest: vi.fn().mockResolvedValue({
-        code: "ABCD2345",
-        senderId: "42",
-        username: "alice",
-        createdAt: "2026-03-22T10:00:00.000Z",
-        expiresAt: "2026-03-22T11:00:00.000Z"
-      })
-    };
-
-    new TelegramService({ bot, enqueueInbound, pairingService, sendText });
-
-    bot.handler?.({
-      update: {
-        message: {
-          from: { id: 42, username: "alice" },
-          chat: { id: 42, type: "private" },
-          text: "hello"
-        }
-      }
-    });
-
     await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(pairingService.isApprovedSender).toHaveBeenCalledWith("42");
-    expect(pairingService.getOrCreatePendingRequest).toHaveBeenCalledWith({
-      senderId: "42",
-      username: "alice"
-    });
-    expect(sendText).toHaveBeenCalledWith(
-      {
-        channel: "telegram",
-        accountId: "default",
-        chatType: "direct",
-        conversationId: "42"
-      },
-      expect.stringContaining("ABCD2345")
-    );
-    expect(enqueueInbound).not.toHaveBeenCalled();
-  });
-
-  it("continues into the runtime queue for approved senders", async () => {
-    const bot = new FakeTelegramBot();
-    const enqueueInbound = vi.fn();
-    const sendText = vi.fn();
-    const pairingService = {
-      isApprovedSender: vi.fn().mockResolvedValue(true),
-      getOrCreatePendingRequest: vi.fn()
-    };
-
-    new TelegramService({ bot, enqueueInbound, pairingService, sendText });
-
-    bot.handler?.({
-      update: {
-        message: {
-          from: { id: 7 },
-          chat: { id: 7, type: "private" },
-          text: "allowed"
-        }
-      }
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(enqueueInbound).toHaveBeenCalledTimes(1);
-    expect(sendText).not.toHaveBeenCalled();
-    expect(pairingService.getOrCreatePendingRequest).not.toHaveBeenCalled();
-  });
-
-  it("resets the current session and skips enqueue for /new", async () => {
-    const bot = new FakeTelegramBot();
-    const enqueueInbound = vi.fn();
-    const resetSession = vi.fn().mockResolvedValue(undefined);
-    const sendText = vi.fn();
-    const pairingService = {
-      isApprovedSender: vi.fn().mockResolvedValue(true),
-      getOrCreatePendingRequest: vi.fn()
-    };
-
-    new TelegramService({ bot, enqueueInbound, pairingService, resetSession, sendText });
-
-    bot.handler?.({
-      update: {
-        message: {
-          from: { id: 7 },
-          chat: { id: 7, type: "private" },
-          text: "/new"
-        }
-      }
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(resetSession).toHaveBeenCalledWith({
-      channel: "telegram",
-      accountId: "default",
-      chatType: "direct",
-      conversationId: "7",
-      senderId: "7",
-      text: "/new"
-    });
-    expect(sendText).toHaveBeenCalledWith(
-      {
-        channel: "telegram",
-        accountId: "default",
-        chatType: "direct",
-        conversationId: "7"
-      },
-      "Started a fresh session. Your next message will use a new Claude session."
-    );
-    expect(enqueueInbound).not.toHaveBeenCalled();
-  });
-
-  it("accepts /new@botname as the new-session command", async () => {
-    const bot = new FakeTelegramBot();
-    const enqueueInbound = vi.fn();
-    const resetSession = vi.fn().mockResolvedValue(undefined);
-    const sendText = vi.fn();
-    const pairingService = {
-      isApprovedSender: vi.fn().mockResolvedValue(true),
-      getOrCreatePendingRequest: vi.fn()
-    };
-
-    new TelegramService({ bot, enqueueInbound, pairingService, resetSession, sendText });
-
-    bot.handler?.({
-      update: {
-        message: {
-          from: { id: 7 },
-          chat: { id: 7, type: "private" },
-          text: "/new@baliclaw_bot"
-        }
-      }
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(resetSession).toHaveBeenCalledTimes(1);
-    expect(enqueueInbound).not.toHaveBeenCalled();
-    expect(sendText).toHaveBeenCalledTimes(1);
-  });
-
-  it("compacts the current session and skips enqueue for /compact", async () => {
-    const bot = new FakeTelegramBot();
-    const enqueueInbound = vi.fn();
-    const compactSession = vi.fn().mockResolvedValue("Compacted the current session.");
-    const sendText = vi.fn();
-    const pairingService = {
-      isApprovedSender: vi.fn().mockResolvedValue(true),
-      getOrCreatePendingRequest: vi.fn()
-    };
-
-    new TelegramService({ bot, enqueueInbound, pairingService, compactSession, sendText });
-
-    bot.handler?.({
-      update: {
-        message: {
-          from: { id: 7 },
-          chat: { id: 7, type: "private" },
-          text: "/compact"
-        }
-      }
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(compactSession).toHaveBeenCalledWith({
-      channel: "telegram",
-      accountId: "default",
-      chatType: "direct",
-      conversationId: "7",
-      senderId: "7",
-      text: "/compact"
-    });
-    expect(sendText).toHaveBeenCalledWith(
-      {
-        channel: "telegram",
-        accountId: "default",
-        chatType: "direct",
-        conversationId: "7"
-      },
-      "Compacted the current session."
-    );
-    expect(enqueueInbound).not.toHaveBeenCalled();
-  });
-
-  it("accepts /compact@botname as the compact-session command", async () => {
-    const bot = new FakeTelegramBot();
-    const enqueueInbound = vi.fn();
-    const compactSession = vi.fn().mockResolvedValue("Compacted the current session.");
-    const sendText = vi.fn();
-    const pairingService = {
-      isApprovedSender: vi.fn().mockResolvedValue(true),
-      getOrCreatePendingRequest: vi.fn()
-    };
-
-    new TelegramService({ bot, enqueueInbound, pairingService, compactSession, sendText });
-
-    bot.handler?.({
-      update: {
-        message: {
-          from: { id: 7 },
-          chat: { id: 7, type: "private" },
-          text: "/compact@baliclaw_bot"
-        }
-      }
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(compactSession).toHaveBeenCalledTimes(1);
-    expect(enqueueInbound).not.toHaveBeenCalled();
-    expect(sendText).toHaveBeenCalledTimes(1);
-  });
-
-  it("returns the current todo snapshot and skips enqueue for /todo", async () => {
-    const bot = new FakeTelegramBot();
-    const enqueueInbound = vi.fn();
-    const getSessionTodo = vi.fn().mockResolvedValue("## Task List\n**1/2 completed**");
-    const sendText = vi.fn();
-    const pairingService = {
-      isApprovedSender: vi.fn().mockResolvedValue(true),
-      getOrCreatePendingRequest: vi.fn()
-    };
-
-    new TelegramService({ bot, enqueueInbound, pairingService, getSessionTodo, sendText });
-
-    bot.handler?.({
-      update: {
-        message: {
-          from: { id: 7 },
-          chat: { id: 7, type: "private" },
-          text: "/todo"
-        }
-      }
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(getSessionTodo).toHaveBeenCalledWith({
-      channel: "telegram",
-      accountId: "default",
-      chatType: "direct",
-      conversationId: "7",
-      senderId: "7",
-      text: "/todo"
-    });
-    expect(sendText).toHaveBeenCalledWith(
-      {
-        channel: "telegram",
-        accountId: "default",
-        chatType: "direct",
-        conversationId: "7"
-      },
-      "## Task List\n**1/2 completed**"
-    );
-    expect(enqueueInbound).not.toHaveBeenCalled();
-  });
-
-  it("accepts /todo@botname as the todo command", async () => {
-    const bot = new FakeTelegramBot();
-    const enqueueInbound = vi.fn();
-    const getSessionTodo = vi.fn().mockResolvedValue(undefined);
-    const sendText = vi.fn();
-    const pairingService = {
-      isApprovedSender: vi.fn().mockResolvedValue(true),
-      getOrCreatePendingRequest: vi.fn()
-    };
-
-    new TelegramService({ bot, enqueueInbound, pairingService, getSessionTodo, sendText });
-
-    bot.handler?.({
-      update: {
-        message: {
-          from: { id: 7 },
-          chat: { id: 7, type: "private" },
-          text: "/todo@baliclaw_bot"
-        }
-      }
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(getSessionTodo).toHaveBeenCalledTimes(1);
-    expect(sendText).toHaveBeenCalledWith(
-      {
-        channel: "telegram",
-        accountId: "default",
-        chatType: "direct",
-        conversationId: "7"
-      },
-      "No task list is available for the current session yet."
-    );
-    expect(enqueueInbound).not.toHaveBeenCalled();
+    expect(onInbound).not.toHaveBeenCalled();
   });
 
   it("returns from the handler immediately after queueing work", async () => {
     const bot = new FakeTelegramBot();
-    let resolveEnqueue: (() => void) | undefined;
-    const enqueueInbound = vi.fn(
+    let resolveInbound: (() => void) | undefined;
+    const onInbound = vi.fn(
       () =>
         new Promise<void>((resolve) => {
-          resolveEnqueue = resolve;
+          resolveInbound = resolve;
         })
     );
 
-    new TelegramService({ bot, enqueueInbound });
+    new TelegramService({ bot, onInbound });
 
     const started = performance.now();
     const result = bot.handler?.({
@@ -451,18 +149,18 @@ describe("TelegramService", () => {
 
     expect(result).toBeUndefined();
     expect(elapsed).toBeLessThan(50);
-    expect(enqueueInbound).toHaveBeenCalledTimes(1);
+    expect(onInbound).toHaveBeenCalledTimes(1);
 
-    resolveEnqueue?.();
+    resolveInbound?.();
   });
 
-  it("logs enqueue failures without throwing from the handler", async () => {
+  it("logs inbound handler failures without throwing from the bot handler", async () => {
     const bot = new FakeTelegramBot();
     const destination = { write: vi.fn(() => true) };
     const logger = createLogger({ subsystem: "telegram", destination });
-    const enqueueInbound = vi.fn().mockRejectedValue(new Error("queue full"));
+    const onInbound = vi.fn().mockRejectedValue(new Error("queue full"));
 
-    new TelegramService({ bot, enqueueInbound, logger });
+    new TelegramService({ bot, onInbound, logger });
 
     expect(() =>
       bot.handler?.({
@@ -477,7 +175,6 @@ describe("TelegramService", () => {
     ).not.toThrow();
 
     await new Promise((resolve) => setTimeout(resolve, 0));
-
     expect(destination.write).toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { TelegramService } from "../src/telegram/service.js";
+import { TelegramService } from "../src/channel/telegram/service.js";
 import { createLogger } from "../src/shared/logger.js";
 
 interface RegisteredHandler {

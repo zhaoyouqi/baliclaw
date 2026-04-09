@@ -1,5 +1,5 @@
-import { readJson5FileOrDefault, writeJson5File } from "../config/file-store.js";
-import { getAppPaths, type AppPaths } from "../config/paths.js";
+import { readJson5FileOrDefault, writeJson5File } from "../../config/file-store.js";
+import { getAppPaths, type AppPaths } from "../../config/paths.js";
 
 export interface WeChatState {
   token?: string;

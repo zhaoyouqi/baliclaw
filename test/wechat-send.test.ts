@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createWeChatTypingHeartbeat, sendWeChatText, WeChatSendError } from "../src/wechat/send.js";
+import { createWeChatTypingHeartbeat, sendWeChatText, WeChatSendError } from "../src/channel/wechat/send.js";
 
 const directTarget = {
   channel: "wechat",

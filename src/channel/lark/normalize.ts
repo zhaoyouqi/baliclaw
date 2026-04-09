@@ -1,5 +1,5 @@
-import { buildDefaultSessionKey } from "../session/stable-key.js";
-import type { InboundEnvelope } from "../shared/types.js";
+import { buildDefaultSessionKey } from "../../session/stable-key.js";
+import type { InboundEnvelope } from "../../shared/types.js";
 
 interface LarkMessageContent {
   text?: string;

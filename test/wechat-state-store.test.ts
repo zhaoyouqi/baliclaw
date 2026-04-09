@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { getAppPaths } from "../src/config/paths.js";
-import { WeChatStateStore } from "../src/wechat/state-store.js";
+import { WeChatStateStore } from "../src/channel/wechat/state-store.js";
 
 describe("WeChatStateStore", () => {
   it("persists login state, sync cursor, and context tokens", async () => {

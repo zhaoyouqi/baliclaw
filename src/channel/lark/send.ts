@@ -1,5 +1,5 @@
 import * as Lark from "@larksuiteoapi/node-sdk";
-import type { DeliveryTarget } from "../shared/types.js";
+import type { DeliveryTarget } from "../../shared/types.js";
 import type { LarkDomain } from "./login.js";
 
 export function createLarkClient(input: {

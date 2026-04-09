@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ChannelControlService } from "../src/channel/control.js";
 import { getAppPaths } from "../src/config/paths.js";
 import { appConfigSchema } from "../src/config/schema.js";
-import { WeChatStateStore } from "../src/wechat/state-store.js";
+import { WeChatStateStore } from "../src/channel/wechat/state-store.js";
 
 describe("ChannelControlService", () => {
   it("enables wechat and persists login state after a successful login wait", async () => {

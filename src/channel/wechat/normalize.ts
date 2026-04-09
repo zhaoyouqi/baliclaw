@@ -1,5 +1,5 @@
-import { buildDefaultSessionKey } from "../session/stable-key.js";
-import type { InboundEnvelope } from "../shared/types.js";
+import { buildDefaultSessionKey } from "../../session/stable-key.js";
+import type { InboundEnvelope } from "../../shared/types.js";
 import { MessageItemType, type MessageItem, type WeChatMessage } from "./types.js";
 
 export function normalizeWeChatMessage(message: WeChatMessage): InboundEnvelope | null {

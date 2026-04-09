@@ -1,5 +1,5 @@
-import { buildTelegramDirectSessionId } from "../session/stable-key.js";
-import type { InboundEnvelope } from "../shared/types.js";
+import { buildTelegramDirectSessionId } from "../../session/stable-key.js";
+import type { InboundEnvelope } from "../../shared/types.js";
 
 export interface TelegramUser {
   id: number;

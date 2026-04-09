@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { WeChatLoginManager } from "../src/wechat/login.js";
+import { WeChatLoginManager } from "../src/channel/wechat/login.js";
 
 describe("WeChatLoginManager", () => {
   it("starts a QR session and completes login when the remote API confirms it", async () => {

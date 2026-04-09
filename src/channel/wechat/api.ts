@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { APP_VERSION } from "../shared/version.js";
+import { APP_VERSION } from "../../shared/version.js";
 import type {
   BaseInfo,
   GetConfigResp,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderTelegramHtmlText, splitTelegramHtmlChunks, splitTelegramMarkdownChunks } from "../src/telegram/format.js";
+import { renderTelegramHtmlText, splitTelegramHtmlChunks, splitTelegramMarkdownChunks } from "../src/channel/telegram/format.js";
 
 describe("renderTelegramHtmlText", () => {
   it("renders core markdown patterns into Telegram HTML", () => {

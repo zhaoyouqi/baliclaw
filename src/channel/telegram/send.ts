@@ -1,5 +1,5 @@
 import { Api } from "grammy";
-import type { DeliveryTarget } from "../shared/types.js";
+import type { DeliveryTarget } from "../../shared/types.js";
 import { renderTelegramHtmlText, splitTelegramHtmlChunks } from "./format.js";
 import { createTelegramClientOptions } from "./proxy.js";
 

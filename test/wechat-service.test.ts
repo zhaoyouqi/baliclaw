@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { getAppPaths } from "../src/config/paths.js";
-import { WeChatService } from "../src/wechat/service.js";
-import { WeChatStateStore } from "../src/wechat/state-store.js";
-import { MessageItemType } from "../src/wechat/types.js";
+import { WeChatService } from "../src/channel/wechat/service.js";
+import { WeChatStateStore } from "../src/channel/wechat/state-store.js";
+import { MessageItemType } from "../src/channel/wechat/types.js";
 
 describe("WeChatService", () => {
   it("starts polling, forwards normalized inbound messages, and persists cursor/context tokens", async () => {

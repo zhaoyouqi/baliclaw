@@ -1,8 +1,8 @@
 import * as Lark from "@larksuiteoapi/node-sdk";
 import type { Logger } from "pino";
-import type { ChannelAdapter } from "../channel/adapter.js";
-import { getLogger } from "../shared/logger.js";
-import type { DeliveryTarget, InboundEnvelope } from "../shared/types.js";
+import type { ChannelAdapter } from "../adapter.js";
+import { getLogger } from "../../shared/logger.js";
+import type { DeliveryTarget, InboundEnvelope } from "../../shared/types.js";
 import type { LarkDomain } from "./login.js";
 import { normalizeLarkMessage, type LarkMessageReceiveEvent } from "./normalize.js";
 import { createLarkClient, sendLarkText, toLarkSdkDomain } from "./send.js";

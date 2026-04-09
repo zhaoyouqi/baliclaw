@@ -1,8 +1,8 @@
 import { Bot, GrammyError, HttpError, type PollingOptions } from "grammy";
 import type { Logger } from "pino";
-import type { ChannelAdapter } from "../channel/adapter.js";
-import { getLogger } from "../shared/logger.js";
-import type { DeliveryTarget, InboundEnvelope } from "../shared/types.js";
+import type { ChannelAdapter } from "../adapter.js";
+import { getLogger } from "../../shared/logger.js";
+import type { DeliveryTarget, InboundEnvelope } from "../../shared/types.js";
 import {
   createTelegramApi,
   createTelegramTypingHeartbeat,

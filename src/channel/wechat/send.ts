@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { DeliveryTarget } from "../shared/types.js";
+import type { DeliveryTarget } from "../../shared/types.js";
 import { renderWeChatPlainText } from "./markdown-filter.js";
 import { sendMessage, sendTyping } from "./api.js";
 import { MessageItemType, MessageState, MessageType, TypingStatus } from "./types.js";

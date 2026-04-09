@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeTelegramUpdate } from "../src/telegram/normalize.js";
+import { normalizeTelegramUpdate } from "../src/channel/telegram/normalize.js";
 
 describe("normalizeTelegramUpdate", () => {
   it("normalizes a Telegram private text message into an inbound envelope", () => {

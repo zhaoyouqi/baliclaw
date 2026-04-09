@@ -1,9 +1,9 @@
 import type { AppConfig } from "../config/schema.js";
 import { PairingService } from "../auth/pairing-service.js";
 import { ConfigService } from "../config/service.js";
-import { LarkLoginManager } from "../lark/login.js";
-import { WeChatLoginManager } from "../wechat/login.js";
-import { WeChatStateStore } from "../wechat/state-store.js";
+import { LarkLoginManager } from "./lark/login.js";
+import { WeChatLoginManager } from "./wechat/login.js";
+import { WeChatStateStore } from "./wechat/state-store.js";
 
 export interface ChannelLoginStartResult {
   channel: string;

@@ -1,7 +1,7 @@
 import type { Logger } from "pino";
-import type { ChannelAdapter } from "../channel/adapter.js";
-import { getLogger } from "../shared/logger.js";
-import type { DeliveryTarget, InboundEnvelope } from "../shared/types.js";
+import type { ChannelAdapter } from "../adapter.js";
+import { getLogger } from "../../shared/logger.js";
+import type { DeliveryTarget, InboundEnvelope } from "../../shared/types.js";
 import { getUpdates } from "./api.js";
 import { WeChatConfigCache } from "./config-cache.js";
 import { normalizeWeChatMessage } from "./normalize.js";

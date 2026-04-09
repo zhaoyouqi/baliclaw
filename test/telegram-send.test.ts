@@ -5,7 +5,7 @@ import {
   createTelegramTypingHeartbeat,
   createTelegramTextSender,
   sendTelegramText
-} from "../src/telegram/send.js";
+} from "../src/channel/telegram/send.js";
 import type { DeliveryTarget } from "../src/shared/types.js";
 
 const directTarget: DeliveryTarget = {

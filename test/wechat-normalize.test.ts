@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { normalizeWeChatMessage } from "../src/wechat/normalize.js";
-import { MessageItemType } from "../src/wechat/types.js";
+import { normalizeWeChatMessage } from "../src/channel/wechat/normalize.js";
+import { MessageItemType } from "../src/channel/wechat/types.js";
 
 describe("normalizeWeChatMessage", () => {
   it("normalizes a direct text message into an inbound envelope", () => {

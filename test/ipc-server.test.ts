@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { getAppPaths } from "../src/config/paths.js";
 import { IpcServer } from "../src/ipc/server.js";
+import { APP_VERSION } from "../src/shared/version.js";
 
 interface JsonResponse {
   statusCode: number;
@@ -103,6 +104,28 @@ describe("IpcServer", () => {
             code: "IPC_ROUTE_NOT_FOUND",
             message: "No IPC route for GET /v1/missing"
           }
+        }
+      });
+    } finally {
+      await server.stop();
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it("uses the package version for the default status response", async () => {
+    const home = await mkdtemp(join(tmpdir(), "baliclaw-ipc-version-"));
+    const paths = getAppPaths(home);
+    const server = new IpcServer({ paths });
+
+    try {
+      await server.start();
+
+      await expect(requestJson(paths.socketFile, "/v1/status")).resolves.toEqual({
+        statusCode: 200,
+        body: {
+          ok: true,
+          service: "baliclaw",
+          version: APP_VERSION
         }
       });
     } finally {

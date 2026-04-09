@@ -11,6 +11,7 @@ import { ScheduledTaskManager } from "../daemon/scheduled-task-manager.js";
 import { ScheduledTaskStatusStore } from "../runtime/scheduled-task-status-store.js";
 import { getLogger } from "../shared/logger.js";
 import type { AppStatus } from "../shared/types.js";
+import { APP_VERSION } from "../shared/version.js";
 import { handleConfigGet, handleConfigSet } from "./handlers/config.js";
 import { handlePairingApprove, handlePairingList } from "./handlers/pairing.js";
 import {
@@ -67,7 +68,7 @@ export class IpcServer {
     this.resolveStatus = options.getStatus ?? (() => ({
       ok: true,
       service: "baliclaw",
-      version: "0.5.0"
+      version: APP_VERSION
     }));
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "@zhaoyuanjie/baliclaw",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "Yet another Claw built on Claude Agent SDK.",
   "type": "module",
   "license": "MIT",
